@@ -505,7 +505,7 @@ function bind() {
   const rc = $('#rad_c'); if (rc) rc.onchange = () => act(() => api('driver/radius', { km: rc.value ? +rc.value : null }));
   on('[data-oacc]', (el) => act(() => api('offer/' + el.dataset.oacc + '/accept', {})));
   on('[data-orej]', (el) => act(() => api('offer/' + el.dataset.orej + '/reject', {})));
-  v.querySelectorAll('[data-hide]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); act(() => api('order/' + el.dataset.hide + '/hide', {})); }));
+  v.querySelectorAll('[data-hide]').forEach((el) => (el.onclick = async (e) => { e.stopPropagation(); if (await ask('Закрыть заказ? Он пропадёт из вашего списка.')) act(() => api('order/' + el.dataset.hide + '/hide', {})); }));
   on('[data-star]', (el) => act(() => api('order/' + el.dataset.oid + '/rate', { rating: +el.dataset.star })));
   const rsw = $('#rsw'); if (rsw) rsw.onclick = () => act(() => api('driver/rating_setting', { on: !S.st.me.allow_rating }));
   on('[data-trips]', () => openTrips());
