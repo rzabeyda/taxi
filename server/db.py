@@ -77,3 +77,9 @@ for _col in ("real_name TEXT", "color TEXT", "year INTEGER", "car_photo TEXT", "
 _conn.execute(
     "CREATE TABLE IF NOT EXISTS chat(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT, text TEXT, created INTEGER)"
 )
+
+for _t, _c in (("users", "allow_rating INTEGER DEFAULT 1"), ("orders", "rating INTEGER")):
+    try:
+        _conn.execute(f"ALTER TABLE {_t} ADD COLUMN {_c}")
+    except sqlite3.OperationalError:
+        pass

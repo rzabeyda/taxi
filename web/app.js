@@ -163,7 +163,7 @@ async function clientOrder() {
     return `<div class="card glow">
       <div class="muted small-t">Водитель принял заказ</div>
       <div class="big" data-eta='${esc(JSON.stringify({ accepted_at: o.accepted_at, eta_min: o.eta_min, arrived_at: o.arrived_at, picked_at: o.picked_at }))}' style="font-size:26px">${etaText(o)}</div>
-      <div class="row" style="margin-top:12px;justify-content:flex-start;gap:12px">${d.driver_photo ? `<img class="ph round" src="${esc(d.driver_photo)}">` : ''}<div class="name">${esc(d.name)}</div></div>
+      <div class="row" style="margin-top:12px;justify-content:flex-start;gap:12px">${d.driver_photo ? `<img class="ph round" src="${esc(d.driver_photo)}">` : ''}<div class="name">${esc(d.name)}${d.rating ? ` <span class="gold small-t">★ ${d.rating}</span>` : ''}</div></div>
       ${d.car_photo ? `<img class="ph" src="${esc(d.car_photo)}">` : ''}
       <div class="muted">${esc(carLine(d))}${d.username ? ' · @' + esc(d.username) : ''}</div>
       <div class="big" style="font-size:28px;letter-spacing:2px">${esc(d.plate)}</div>
@@ -176,6 +176,7 @@ async function clientOrder() {
   // done
   return `<div class="card glow center"><div class="muted">Поездка завершена</div><div class="big">${eur(o.price)}</div>
     <div class="muted">${esc(o.driver.name)} · ${esc(carLine(o.driver))} ${esc(o.driver.plate)}</div></div>
+    ${o.can_rate ? `<div class="card center"><div class="muted small-t">Оцените поездку</div><div class="stars">${[1, 2, 3, 4, 5].map((n) => `<button data-star="${n}" data-oid="${o.id}">☆</button>`).join('')}</div></div>` : o.rating ? `<div class="card center muted">Ваша оценка: <b class="gold">${'★'.repeat(o.rating)}</b></div>` : ''}
     <button class="btn gold" data-fav="${o.driver.id}" data-on="${o.fav ? 0 : 1}">${o.fav ? '★ Убрать из избранного' : '☆ Добавить водителя в избранное'}</button>
     <div style="height:10px"></div><button class="btn" data-dismiss="${o.id}">Готово</button>`;
 }
@@ -328,13 +329,14 @@ async function sendChat() {
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
   return `<div class="card glow" data-edit="1" style="cursor:pointer"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
-    <div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div><div class="muted small-t">Нажмите, чтобы изменить</div></div></div></div>
+    ${me.rating_n ? `<div class="gold">★ ${me.rating} <span class="muted small-t">(${me.rating_n})</span></div>` : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div><div class="muted small-t">Нажмите, чтобы изменить</div></div></div></div>
     <div class="stats">
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat" data-pay="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b><span class="small-t ${s.debt > 0 ? 'red' : 'muted'}">${s.debt > 0 ? 'Долг ' + eur(s.debt) : 'Оплата'}</span></div>
     <div class="stat" data-trips="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Поездки</span><b>${s.count}</b></div>
     <div class="stat"><span class="muted small-t">Расстояние</span><b>${s.km} км</b></div>
-    <div class="stat" style="grid-column:1/-1"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b></div></div>`;
+    <div class="stat" style="grid-column:1/-1"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b></div></div>
+    <div class="card"><div class="row"><div><div class="name">Оценки клиентов</div><div class="muted small-t">Клиент сможет поставить 1–5 звёзд после поездки</div></div><div class="switch ${me.allow_rating ? 'on' : ''}" id="rsw"></div></div></div>`;
 }
 
 async function openPay() {
@@ -442,6 +444,8 @@ function bind() {
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
+  on('[data-star]', (el) => act(() => api('order/' + el.dataset.oid + '/rate', { rating: +el.dataset.star })));
+  const rsw = $('#rsw'); if (rsw) rsw.onclick = () => act(() => api('driver/rating_setting', { on: !S.st.me.allow_rating }));
   on('[data-trips]', () => openTrips());
   const cs = $('#chat_send'); if (cs) { cs.onclick = sendChat; $('#chat_in').onkeydown = (e) => { if (e.key === 'Enter') sendChat(); }; window.scrollTo(0, document.body.scrollHeight); }
   on('[data-pay]', () => openPay());

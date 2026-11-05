@@ -66,6 +66,14 @@ def debt(driver_id: int) -> float:
     return round(r["d"], 2)
 
 
+def driver_rating(driver_id: int):
+    r = db.q1(
+        "SELECT AVG(rating) a, COUNT(rating) n FROM orders WHERE driver_id=? AND rating IS NOT NULL",
+        (driver_id,),
+    )
+    return (round(r["a"], 1) if r["n"] else None), r["n"]
+
+
 def is_busy(driver_id: int) -> bool:
     return bool(
         db.q1("SELECT 1 x FROM orders WHERE driver_id=? AND status='accepted'", (driver_id,))
@@ -153,7 +161,7 @@ def nav_links(o: dict) -> dict:
 def order_view(o: dict, viewer: int, with_nav=False) -> dict:
     keys = (
         "id", "from_text", "to_text", "price", "status", "km", "eta_min", "created",
-        "accepted_at", "arrived_at", "picked_at", "done_at", "commission",
+        "accepted_at", "arrived_at", "picked_at", "done_at", "commission", "rating",
     )
     d = {k: o[k] for k in keys}
     d["mine_client"] = o["client_id"] == viewer
@@ -164,6 +172,12 @@ def order_view(o: dict, viewer: int, with_nav=False) -> dict:
             "phone": dr["phone"], "username": dr["username"], "color": dr["color"],
             "year": dr["year"], "car_photo": dr["car_photo"], "driver_photo": dr["driver_photo"],
         }
+        avg, n = driver_rating(dr["tg_id"])
+        if dr["allow_rating"] and n:
+            d["driver"]["rating"], d["driver"]["rating_n"] = avg, n
+        d["can_rate"] = bool(
+            o["status"] == "done" and o["client_id"] == viewer and dr["allow_rating"] and o["rating"] is None
+        )
     cl = get_user(o["client_id"])
     d["client"] = {"id": cl["tg_id"], "name": cl["name"], "username": cl["username"]}
     if o["status"] == "done":
@@ -351,11 +365,13 @@ async def state(request: Request, role: str = "client"):
     out = {
         "me": {
             "id": uid, "name": u["name"], "username": u["username"], "is_driver": bool(u["is_driver"]),
-            "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "driver_photo": u["driver_photo"], "plate": u["plate"], "phone": u["phone"],
+            "allow_rating": bool(u["allow_rating"]), "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "driver_photo": u["driver_photo"], "plate": u["plate"], "phone": u["phone"],
             "debt": d, "limit": DEBT_LIMIT, "blocked": d >= DEBT_LIMIT,
         },
         "now": now(),
     }
+    if u["is_driver"]:
+        out["me"]["rating"], out["me"]["rating_n"] = driver_rating(uid)
     co = active_client_order(uid)
     out["client_order"] = order_view(co, uid, True) if co else None
     if u["is_driver"]:
@@ -738,6 +754,39 @@ async def driver_pay(request: Request):
         except Exception as e:
             log.warning("admin notify: %s", e)
     return {"ok": True, "amount": d}
+
+
+@app.post("/api/driver/rating_setting")
+async def rating_setting(request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Вы не водитель")
+    b = await request.json()
+    db.x("UPDATE users SET allow_rating=? WHERE tg_id=?", (int(bool(b.get("on"))), u["tg_id"]))
+    return {"ok": True}
+
+
+@app.post("/api/order/{oid}/rate")
+async def order_rate(oid: int, request: Request):
+    u = auth(request)
+    b = await request.json()
+    try:
+        r = int(b.get("rating"))
+    except Exception:
+        raise HTTPException(400, "Оценка от 1 до 5")
+    if not 1 <= r <= 5:
+        raise HTTPException(400, "Оценка от 1 до 5")
+    o = get_order(oid)
+    if not o or o["client_id"] != u["tg_id"] or o["status"] != "done" or not o["driver_id"]:
+        raise HTTPException(400, "Нельзя оценить")
+    dr = get_user(o["driver_id"])
+    if not dr["allow_rating"]:
+        raise HTTPException(400, "Водитель отключил оценки")
+    n, _ = db.x("UPDATE orders SET rating=? WHERE id=? AND rating IS NULL", (r, oid))
+    if not n:
+        raise HTTPException(400, "Уже оценено")
+    asyncio.create_task(notify(o["driver_id"], f"⭐ Клиент поставил оценку: {r} из 5"))
+    return {"ok": True}
 
 
 _last_chat = {}
