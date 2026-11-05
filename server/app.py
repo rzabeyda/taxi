@@ -351,7 +351,7 @@ async def state(request: Request, role: str = "client"):
     out = {
         "me": {
             "id": uid, "name": u["name"], "username": u["username"], "is_driver": bool(u["is_driver"]),
-            "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "plate": u["plate"], "phone": u["phone"],
+            "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "driver_photo": u["driver_photo"], "plate": u["plate"], "phone": u["phone"],
             "debt": d, "limit": DEBT_LIMIT, "blocked": d >= DEBT_LIMIT,
         },
         "now": now(),
@@ -668,6 +668,12 @@ async def driver_stats(request: Request):
         "FROM orders WHERE driver_id=? AND status='done'",
         (uid,),
     )
+    extra = db.q1(
+        "SELECT COALESCE(SUM(km),0) km, COUNT(DISTINCT date(done_at,'unixepoch')) days "
+        "FROM orders WHERE driver_id=? AND status='done'",
+        (uid,),
+    )
+    since = max(1, (now() - (u["created"] or now())) // 86400 + 1)
     paid = db.q1(
         "SELECT COALESCE(SUM(amount),0) p FROM ledger WHERE driver_id=? AND kind='payment'", (uid,)
     )["p"]
@@ -680,6 +686,7 @@ async def driver_stats(request: Request):
         (uid,),
     )
     return {
+        "km": round(extra["km"], 1), "work_days": extra["days"], "since_days": since,
         "count": s["n"], "gross": round(s["gross"], 2), "commission": round(s["com"], 2),
         "earned": round(s["gross"] - s["com"], 2), "paid": round(paid, 2),
         "pending": round(pend, 2), "debt": debt(uid), "limit": DEBT_LIMIT,

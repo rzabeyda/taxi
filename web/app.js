@@ -6,6 +6,12 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
 const carLine = (x) => [x.car, x.color, x.year].filter(Boolean).join(', ');
+const tgUser = () => (tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
+function avatar(url, name) {
+  const u = url || tgUser().photo_url;
+  const ini = esc((name || '?').trim().charAt(0).toUpperCase());
+  return u ? `<img class="avatar" src="${esc(u)}" onerror="this.outerHTML='<div class=\'avatar\'>${ini}</div>'">` : `<div class="avatar">${ini}</div>`;
+}
 const eur = (v) => (Math.round(Number(v || 0) * 100) / 100).toString().replace('.', ',') + ' €';
 const dt = (ts) => new Date(ts * 1000).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -197,7 +203,7 @@ async function clientHistory() {
 async function clientCabinet() {
   const [rows, favs] = await Promise.all([api('history?role=client'), api('favorites')]);
   const spent = rows.reduce((a, o) => a + o.price, 0);
-  return `<div class="card"><div class="name">${esc(S.st.me.name)}</div></div>
+  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(null, S.st.me.name)}<div><div class="name" style="font-size:20px">${esc(S.st.me.name)}</div>${S.st.me.username ? '<div class="muted">@' + esc(S.st.me.username) + '</div>' : ''}</div></div></div>
     <div class="stats"><div class="stat"><span class="muted small-t">Поездок</span><b>${rows.length}</b></div>
     <div class="stat"><span class="muted small-t">Потрачено</span><b>${eur(spent)}</b></div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Избранные водители</div>
@@ -278,12 +284,15 @@ async function driverTrips() {
 }
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
-  return `<div class="stats">
-    <div class="stat"><span class="muted small-t">Поездок</span><b>${s.count}</b></div>
+  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
+    ${me.username ? '<div class="muted">@' + esc(me.username) + '</div>' : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div></div></div></div>
+    <div class="stats">
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
+    <div class="stat"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b></div>
     <div class="stat"><span class="muted small-t">Оборот</span><b>${eur(s.gross)}</b></div>
-    <div class="stat"><span class="muted small-t">Отдано сервису</span><b>${eur(s.commission)}</b></div></div>
-    <div class="card"><div class="name">${esc(me.name)}${me.username ? ' <span class="muted">@' + esc(me.username) + '</span>' : ''}</div><div class="muted">${esc(carLine(me))} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
+    <div class="stat"><span class="muted small-t">Поездок</span><b>${s.count}</b></div>
+    <div class="stat"><span class="muted small-t">Проехано</span><b>${s.km} км</b></div>
+    <div class="stat"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b><span class="muted small-t">с нами ${s.since_days} дн.</span></div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Баланс</div>
     ${await driverBalance()}`;
 }
