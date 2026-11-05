@@ -203,7 +203,7 @@ async function clientHistory() {
 async function clientCabinet() {
   const [rows, favs] = await Promise.all([api('history?role=client'), api('favorites')]);
   const spent = rows.reduce((a, o) => a + o.price, 0);
-  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(null, S.st.me.name)}<div><div class="name" style="font-size:20px">${esc(S.st.me.name)}</div>${S.st.me.username ? '<div class="muted">@' + esc(S.st.me.username) + '</div>' : ''}</div></div></div>
+  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(null, S.st.me.name)}<div><div class="name" style="font-size:20px">${esc(S.st.me.name)}</div></div></div></div>
     <div class="stats"><div class="stat"><span class="muted small-t">Поездок</span><b>${rows.length}</b></div>
     <div class="stat"><span class="muted small-t">Потрачено</span><b>${eur(spent)}</b></div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Избранные водители</div>
@@ -292,28 +292,75 @@ async function driverTrips() {
 }
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
-  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
-    ${me.username ? '<div class="muted">@' + esc(me.username) + '</div>' : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div></div></div></div>
+  return `<div class="card glow" data-edit="1" style="cursor:pointer"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
+    <div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div><div class="muted small-t">Нажмите, чтобы изменить</div></div></div></div>
     <div class="stats">
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
-    <div class="stat"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b></div>
-    <div class="stat"><span class="muted small-t">Оборот</span><b>${eur(s.gross)}</b></div>
-    <div class="stat"><span class="muted small-t">Поездок</span><b>${s.count}</b></div>
-    <div class="stat"><span class="muted small-t">Проехано</span><b>${s.km} км</b></div>
-    <div class="stat"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b><span class="muted small-t">с нами ${s.since_days} дн.</span></div></div>
-    <div class="muted small-t" style="margin:16px 4px 0">Баланс</div>
-    ${await driverBalance()}`;
+    <div class="stat" data-pay="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b><span class="small-t ${s.debt > 0 ? 'red' : 'muted'}">${s.debt > 0 ? 'Долг ' + eur(s.debt) : 'Оплата'}</span></div>
+    <div class="stat"><span class="muted small-t">Поездки</span><b>${s.count}</b></div>
+    <div class="stat"><span class="muted small-t">Расстояние</span><b>${s.km} км</b></div>
+    <div class="stat" style="grid-column:1/-1"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b></div></div>`;
 }
-async function driverBalance() {
+
+async function openPay() {
   const s = await api('driver/stats');
   const pct = Math.min(100, Math.round((s.debt / s.limit) * 100));
-  return `<div class="card glow"><div class="muted small-t">Долг по комиссии</div><div class="big ${s.debt >= s.limit ? 'red' : ''}">${eur(s.debt)}</div>
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto">
+    <div class="muted small-t">Долг по комиссии</div><div class="big ${s.debt >= s.limit ? 'red' : ''}">${eur(s.debt)}</div>
     <div class="bar ${pct >= 80 ? 'warn' : ''}" style="margin:10px 0"><i style="width:${pct}%"></i></div>
-    <div class="muted small-t">Лимит ${eur(s.limit)}: при достижении приём заказов блокируется до оплаты.<br>Комиссия: ${s.pct}% с поездки, минимум ${eur(s.min)}.</div></div>
+    <div class="muted small-t">Лимит ${eur(s.limit)}: при достижении приём заказов блокируется до оплаты.<br>Комиссия: ${s.pct}% с поездки, минимум ${eur(s.min)}.</div>
     <div class="card"><div class="name">Как оплатить</div><div class="muted" style="margin-top:6px;white-space:pre-line">${esc(s.pay_info)}</div></div>
     ${s.pending ? `<div class="card center muted">Заявка на ${eur(s.pending)} отправлена, ждите подтверждения</div>` : ''}
     <button class="btn" id="pay_ok" ${s.debt <= 0 || s.pending ? 'disabled' : ''}>Я оплатил ${s.debt > 0 ? eur(s.debt) : ''}</button>
-    ${s.payments.length ? `<div class="muted small-t" style="margin:16px 4px 0">Оплаты</div>` + s.payments.map((p) => `<div class="card row"><span class="muted">${dt(p.created)}</span><b class="green">${eur(p.amount)}</b></div>`).join('') : ''}`;
+    <div style="height:10px"></div><button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+  $('#pay_ok').onclick = async () => {
+    try { await api('driver/pay', {}); toast('Заявка отправлена'); m.classList.add('hidden'); }
+    catch (e) { toast(e.message); }
+    refresh(true);
+  };
+}
+
+function openEdit() {
+  const me = S.st.me, ph = {};
+  const nm = (me.name || '').split(' '), cr = (me.car || '').split(' ');
+  const v = (x) => esc(x == null ? '' : x);
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto">
+    <div class="name" style="margin-bottom:8px">Профиль водителя</div>
+    <label>Имя</label><input id="e_first" value="${v(nm[0])}">
+    <div style="height:10px"></div><label>Фамилия</label><input id="e_last" value="${v(nm.slice(1).join(' '))}">
+    <div style="height:10px"></div><label>Марка</label><input id="e_make" value="${v(cr[0])}">
+    <div style="height:10px"></div><label>Модель</label><input id="e_model" value="${v(cr.slice(1).join(' '))}">
+    <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="e_color" value="${v(me.color)}"></div>
+    <div><label>Год</label><input id="e_year" type="number" inputmode="numeric" value="${v(me.year)}"></div></div>
+    <div style="height:10px"></div><label>Номер авто</label><input id="e_plate" value="${v(me.plate)}" style="text-transform:uppercase">
+    <div style="height:10px"></div><label>Телефон</label><input id="e_phone" type="tel" value="${v(me.phone)}">
+    <div class="grid2" style="margin-top:14px">
+      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="en_car"></span><input type="file" accept="image/*" id="e_carph" hidden></label>
+      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="en_drv"></span><input type="file" accept="image/*" id="e_drvph" hidden></label></div>
+    <div style="height:14px"></div><button class="btn" id="e_ok">Сохранить</button>
+    <div style="height:10px"></div><button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+  [['e_carph', 'en_car', 'car_photo'], ['e_drvph', 'en_drv', 'driver_photo']].forEach(([i, n, k]) => {
+    $('#' + i).onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { ph[k] = await readImg(f); $('#' + n).textContent = 'выбрано ✓'; } catch (x) { toast('Не удалось прочитать фото'); } };
+  });
+  $('#e_ok').onclick = async () => {
+    const g = (id) => $('#' + id).value.trim();
+    if (!g('e_first') || !g('e_last')) return toast('Укажите имя и фамилию');
+    if (!g('e_make') || !g('e_model')) return toast('Укажите марку и модель');
+    if (!g('e_color') || !g('e_year') || !g('e_plate')) return toast('Заполните цвет, год и номер');
+    try {
+      await api('driver/register', { name: g('e_first') + ' ' + g('e_last'), car: g('e_make') + ' ' + g('e_model'), color: g('e_color'), year: g('e_year'), plate: g('e_plate'), phone: g('e_phone'), car_photo: ph.car_photo, driver_photo: ph.driver_photo });
+      m.classList.add('hidden'); toast('Сохранено');
+    } catch (e) { return toast(e.message); }
+    S.key = ''; refresh(true);
+  };
 }
 
 /* ---------------------------------------------------------------- order sheet (driver) */
@@ -359,6 +406,8 @@ function bind() {
   on('[data-ddismiss]', (el) => { ls('dd' + el.dataset.ddismiss, '1'); S.key = ''; render(true); });
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
+  on('[data-edit]', () => openEdit());
+  on('[data-pay]', () => openPay());
   on('[data-picked]', (el) => act(() => api('order/' + el.dataset.picked + '/picked', {})));
   on('[data-complete]', async (el) => { if (await ask('Завершить поездку?')) act(() => api('order/' + el.dataset.complete + '/complete', {})); });
   on('[data-release]', async (el) => { if (await ask('Отказаться от заказа? Он вернётся в общий список.')) act(() => api('order/' + el.dataset.release + '/release', {})); });
