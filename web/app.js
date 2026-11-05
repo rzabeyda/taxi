@@ -363,7 +363,7 @@ async function driverCabinet() {
       <div class="pill gold" data-pay="1"><span class="wi">${IC.wallet}</span><b>${eur(s.commission)}</b>${s.debt > 0 ? `<i class="red">− ${eur(s.debt)}</i>` : ''}</div>
       <div class="pill" data-trips="1"><span>Поездки</span><b>${s.count}</b></div>
       <div class="pill dim"><span>Расстояние</span><b>${s.km} км</b></div>
-      <div class="pill dim"><span>Дней работает</span><b>${s.work_days}</b></div>
+      <div class="pill dim"><span>Дни</span><b>${s.work_days}</b></div>
       <div class="pill ${me.allow_rating ? 'green' : 'red'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
     </div>`;
 }
