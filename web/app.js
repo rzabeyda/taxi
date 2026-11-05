@@ -190,7 +190,8 @@ async function clientCabinet() {
 /* ---------------------------------------------------------------- driver */
 function driverRegister() {
   return `<div class="card"><div class="name">Стать водителем</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
-    <label>Имя и фамилия</label><input id="r_name" placeholder="Иван Иванов" autocomplete="name">
+    <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
+    <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
     <div style="height:10px"></div><label>Марка и цвет авто</label><input id="r_car" placeholder="Toyota Prius, белая">
     <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
     <div style="height:10px"></div><label>Телефон (по желанию)</label><input id="r_phone" type="tel" placeholder="+372 …"></div>
@@ -327,7 +328,7 @@ function bind() {
     });
   }
   const rk = $('#r_ok');
-  if (rk) rk.onclick = () => act(() => api('driver/register', { name: $('#r_name').value, car: $('#r_car').value, plate: $('#r_plate').value, phone: $('#r_phone').value }));
+  if (rk) rk.onclick = () => act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: $('#r_car').value, plate: $('#r_plate').value, phone: $('#r_phone').value }));
   const pk = $('#pay_ok');
   if (pk) pk.onclick = () => act(async () => { await api('driver/pay', {}); toast('Заявка отправлена'); });
 }
