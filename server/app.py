@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     CallbackQuery,
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
@@ -673,14 +674,20 @@ async def driver_pay(request: Request):
 
 
 # ---------------------------------------------------------------- bot
+_welcome_file_id = None
+
+
 @dp.message(CommandStart())
 async def cmd_start(m: Message):
+    global _welcome_file_id
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🚕 Открыть такси", web_app=WebAppInfo(url=BASE_URL))]]
+        inline_keyboard=[[InlineKeyboardButton(text="Открыть такси", web_app=WebAppInfo(url=BASE_URL))]]
     )
-    await m.answer(
-        "Такси Таллин 🚕\nЗаказывайте поездку или принимайте заказы как водитель.", reply_markup=kb
-    )
+    caption = "Заказывайте поездку или принимайте заказы как водитель."
+    photo = _welcome_file_id or FSInputFile(os.path.join(os.path.dirname(__file__), "assets", "welcome.jpg"))
+    sent = await m.answer_photo(photo, caption=caption, reply_markup=kb)
+    if not _welcome_file_id and sent.photo:
+        _welcome_file_id = sent.photo[-1].file_id
 
 
 @dp.message(Command("id"))
