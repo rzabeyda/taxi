@@ -255,13 +255,15 @@ async function driverOrders() {
   h += `<div class="card"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
     <div class="muted small-t">${me.online ? 'Вам приходят новые заказы' : 'Включите, чтобы получать заказы'}</div></div>
     <div class="switch ${me.online ? 'on' : ''}" id="sw"></div></div></div>`;
-  if (me.blocked) return h + `<div class="card glow"><div class="name red">Приём заказов заблокирован</div><div class="muted" style="margin-top:6px">Долг ${eur(me.debt)}. Оплатите комиссию во вкладке «Баланс».</div></div>`;
+  if (me.blocked) return h + `<div class="card glow"><div class="name red">Приём заказов заблокирован</div><div class="muted" style="margin-top:6px">Долг ${eur(me.debt)}. Оплатите комиссию в Профиле (блок «Комиссия сервису»).</div></div>`;
   if (!me.online) return h;
   const list = st.open_orders || [];
   if (!list.length) return h + '<div class="card center muted pulse">Ждём новые заказы…</div>';
-  return h + list.map((x) => `<div class="card glow" data-open="${x.id}" style="cursor:pointer">
-    <div class="row"><b style="font-size:24px">${eur(x.price)}</b>${kmTag(x)}</div>${routeHtml(x)}
-    <div class="muted small-t">${dt(x.created)}${x.client ? ' · ' + esc(x.client.name) : ''}</div></div>`).join('');
+  const sorted = list.slice().sort((p, q) => (q.personal ? 1 : 0) - (p.personal ? 1 : 0));
+  return h + sorted.map((x) => `<div class="orow ${x.personal ? 'personal' : ''}" data-open="${x.id}">
+    <div class="op"><b>${eur(x.price)}</b>${x.km ? `<span>${x.km} км</span>` : ''}</div>
+    <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${routeHtml(x)}</div>
+    <div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`).join('');
 }
 function driverActive(o) {
   const c = o.client;
@@ -329,7 +331,7 @@ async function sendChat() {
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
   return `<div class="card glow" data-edit="1" style="cursor:pointer"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
-    ${me.rating_n ? `<div class="gold">★ ${me.rating} <span class="muted small-t">(${me.rating_n})</span></div>` : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div><div class="muted small-t">Нажмите, чтобы изменить</div></div></div></div>
+    ${me.rating_n ? `<div class="gold">★ ${me.rating} <span class="muted small-t">(${me.rating_n})</span></div>` : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div></div></div></div>
     <div class="stats">
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat" data-pay="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b><span class="small-t ${s.debt > 0 ? 'red' : 'muted'}">${s.debt > 0 ? 'Долг ' + eur(s.debt) : 'Оплата'}</span></div>
@@ -407,8 +409,8 @@ async function openOrder(id) {
   if (o.status !== 'open') return toast('Заказ уже занят');
   S.eta = 10;
   const m = $('#modal');
-  m.innerHTML = `<div class="sheet">
-    <div class="row"><b style="font-size:28px">${eur(o.price)}</b>${kmTag(o)}</div>${routeHtml(o)}
+  m.innerHTML = `<div class="sheet ${o.personal ? 'personal' : ''}">
+    ${o.personal ? '<div class="plabel">Заказ лично вам</div>' : ''}<div class="row"><b style="font-size:28px">${eur(o.price)}</b>${kmTag(o)}</div>${routeHtml(o)}
     <div class="muted small-t">Вам останется ≈ ${eur(o.price - Math.max(0.5, o.price * 0.1))}</div>
     <div class="grid2" style="margin:12px 0"><a class="btn sm" href="${o.nav.gm_route}" target="_blank">Маршрут Google</a><a class="btn sm" href="${o.nav.waze_pickup}" target="_blank">Waze: к клиенту</a></div>
     <label>Через сколько минут будете у клиента?</label>

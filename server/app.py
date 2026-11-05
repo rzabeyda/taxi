@@ -165,6 +165,7 @@ def order_view(o: dict, viewer: int, with_nav=False) -> dict:
     )
     d = {k: o[k] for k in keys}
     d["mine_client"] = o["client_id"] == viewer
+    d["personal"] = o["status"] == "open" and o["target_driver_id"] == viewer
     if o["driver_id"]:
         dr = get_user(o["driver_id"])
         d["driver"] = {
