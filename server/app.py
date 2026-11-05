@@ -602,12 +602,14 @@ async def order_raise(oid: int, request: Request):
 async def order_cancel(oid: int, request: Request):
     u = auth(request)
     o = get_order(oid)
-    if not o or o["client_id"] != u["tg_id"] or o["status"] not in ("open", "accepted"):
+    if not o or o["client_id"] != u["tg_id"]:
         raise HTTPException(400, "Нельзя отменить")
-    db.x("UPDATE orders SET status='cancelled' WHERE id=? AND status IN ('open','accepted')", (oid,))
+    if o["status"] != "open":
+        raise HTTPException(400, "Заказ уже принят водителем, отменить нельзя")
+    n, _ = db.x("UPDATE orders SET status='cancelled' WHERE id=? AND status='open'", (oid,))
+    if not n:
+        raise HTTPException(400, "Заказ уже принят водителем, отменить нельзя")
     asyncio.create_task(clear_notifs(oid, "❌ Заказ отменён клиентом"))
-    if o["driver_id"]:
-        asyncio.create_task(notify(o["driver_id"], "❌ Клиент отменил заказ"))
     return {"ok": True}
 
 
@@ -655,9 +657,6 @@ async def location(request: Request):
         elif o["arrived_at"] and not o["picked_at"] and dp > 300:
             db.x("UPDATE orders SET picked_at=? WHERE id=?", (now(), o["id"]))
             o["picked_at"] = now()
-    if o["picked_at"] and o["to_lat"] is not None and now() - o["picked_at"] > 60:
-        if geo.haversine_m(lat, lng, o["to_lat"], o["to_lng"]) < ARRIVE_M:
-            await finish(o["id"], auto=True)
     return {"ok": True}
 
 

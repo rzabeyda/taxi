@@ -171,7 +171,7 @@ async function clientOrder() {
     <div class="card">${routeHtml(o)}<div class="row"><b>${eur(o.price)}</b>${kmTag(o)}</div></div>
     <a class="btn" href="${tgLink(d)}" target="_blank">Написать водителю</a>
     ${d.phone ? `<div style="height:10px"></div><a class="btn" href="tel:${esc(d.phone)}">Позвонить</a>` : ''}
-    ${o.picked_at ? '' : `<div style="height:10px"></div><button class="btn danger" data-cancel="${o.id}">Отменить заказ</button>`}`;
+`;
   }
   // done
   return `<div class="card glow center"><div class="muted">Поездка завершена</div><div class="big">${eur(o.price)}</div>
@@ -287,7 +287,7 @@ function driverActive(o) {
   ${o.picked_at ? '' : `<button class="btn" data-picked="${o.id}">Клиент в машине</button><div style="height:10px"></div>`}
   <button class="btn gold" data-complete="${o.id}">Завершить поездку</button>
   ${o.picked_at ? '' : `<div style="height:10px"></div><button class="btn danger" data-release="${o.id}">Отказаться от заказа</button>`}
-  <div class="muted small-t center" style="padding:14px 0">Поездка завершится сама, когда вы приедете на место (держите приложение открытым).</div>`;
+`;
 }
 
 async function openTrips() {
