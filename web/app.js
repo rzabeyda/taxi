@@ -84,7 +84,8 @@ document.addEventListener('click', (e) => {
 function drawChrome() {
   document.querySelectorAll('#roleSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.role === S.role));
   $('#title').textContent = TABS[S.role][S.tab][0];
-  $('#nav').innerHTML = TABS[S.role].map((t, i) => `<button data-i="${i}" class="${i === S.tab ? 'on' : ''}">${t[1]}<span>${t[0]}</span></button>`).join('');
+  const lock = (i) => S.role === 'driver' && S.st && S.st.me.is_driver && S.st.me.blocked && i < 2;
+  $('#nav').innerHTML = TABS[S.role].map((t, i) => `<button data-i="${i}" class="${i === S.tab ? 'on' : ''} ${lock(i) ? 'lock' : ''}">${t[1]}<span>${t[0]}</span></button>`).join('');
 }
 $('#roleSwitch').onclick = (e) => {
   const r = e.target.dataset.role; if (!r || r === S.role) return;
@@ -114,7 +115,7 @@ function viewKey() {
   if (S.role === 'client') {
     if (S.tab === 0) k.o = st.client_order; else k.o = 0;
   } else {
-    k.d = st.me.is_driver;
+    k.d = st.me.is_driver; k.b = st.me.blocked;
     if (S.tab === 0) { k.o = st.driver_order; k.on = st.me.online; k.rad = st.me.radius; k.b = st.me.blocked; k.l = (st.open_orders || []).map((o) => o.id + ':' + o.price); }
     else if (S.tab === 2) k.debt = st.me.debt;
   }
@@ -256,6 +257,10 @@ function driverRegister() {
   <button class="btn" id="r_ok">Зарегистрироваться</button>`;
 }
 
+const blockedHtml = (me) => `<div class="card neon-r center"><div class="name red">Доступ закрыт</div><div class="big red">${eur(me.debt)}</div>
+  <div class="muted" style="margin-top:6px">Комиссия достигла ${eur(me.limit)}. Оплатите, чтобы вернуться к заказам и чату.</div></div>
+  <button class="btn danger" data-pay="1">Оплатить</button>`;
+
 async function driverOrders() {
   const st = S.st, me = st.me, o = st.driver_order;
   let h = '';
@@ -267,6 +272,7 @@ async function driverOrders() {
     }
   }
   if (o && o.status === 'accepted') return driverActive(o);
+  if (me.blocked) return blockedHtml(me);
   h += `<div class="card ${me.online ? 'neon-g' : 'neon-r'}"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
     <div class="muted small-t">${me.online ? 'Вам приходят новые заказы' : 'Включите, чтобы получать заказы'}</div></div>
     <div class="switch ${me.online ? 'on' : 'off'}" id="sw"></div></div></div>`;
@@ -327,6 +333,7 @@ async function openTrips() {
 let chatLast = 0;
 const msgHtml = (m) => `<div class="msg ${m.mine ? 'mine' : ''}"><div class="mn">${m.mine ? 'Вы' : esc(m.name)}</div><div>${esc(m.text)}</div><div class="mt">${new Date(m.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`;
 async function driverChat() {
+  if (S.st.me.blocked) return blockedHtml(S.st.me);
   const rows = await api('chat');
   chatLast = rows.length ? rows[rows.length - 1].id : 0;
   return `<div id="chatlist" class="chatlist">${rows.length ? rows.map(msgHtml).join('') : '<div class="muted center" id="chatempty">Сообщений пока нет</div>'}</div>

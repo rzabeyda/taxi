@@ -175,3 +175,5 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 .radrow .chip{padding:9px 10px;font-size:14px;flex:none;white-space:nowrap}
 .radrow input{flex:1;min-width:0;padding:9px 8px;font-size:14px;border-radius:14px;text-align:center}
 .radrow input.on{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.6)}
+
+nav#nav button.lock{opacity:.4}

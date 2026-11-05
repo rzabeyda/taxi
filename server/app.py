@@ -950,6 +950,8 @@ async def chat_get(request: Request, after: int = 0):
     u = auth(request)
     if not u["is_driver"]:
         raise HTTPException(403, "Чат только для водителей")
+    if debt(u["tg_id"]) >= DEBT_LIMIT:
+        raise HTTPException(403, "Чат закрыт до оплаты комиссии")
     if after > 0:
         rows = db.q("SELECT * FROM chat WHERE id>? ORDER BY id ASC LIMIT 100", (after,))
     else:
@@ -966,6 +968,8 @@ async def chat_post(request: Request):
     u = auth(request)
     if not u["is_driver"]:
         raise HTTPException(403, "Чат только для водителей")
+    if debt(u["tg_id"]) >= DEBT_LIMIT:
+        raise HTTPException(403, "Чат закрыт до оплаты комиссии")
     b = await request.json()
     text = str(b.get("text", "")).strip()[:500]
     if not text:
