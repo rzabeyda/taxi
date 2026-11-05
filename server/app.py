@@ -1060,17 +1060,16 @@ _last_chat = {}
 @app.get("/api/chat")
 async def chat_get(request: Request, after: int = 0):
     u = auth(request)
-    if not u["is_driver"]:
-        raise HTTPException(403, "Чат только для водителей")
     if debt(u["tg_id"]) >= DEBT_LIMIT:
         raise HTTPException(403, "Чат закрыт до оплаты комиссии")
+    sel = "SELECT c.*, COALESCE((SELECT is_driver FROM users WHERE tg_id=c.user_id),0) drv FROM chat c"
     if after > 0:
-        rows = db.q("SELECT * FROM chat WHERE id>? ORDER BY id ASC LIMIT 100", (after,))
+        rows = db.q(sel + " WHERE c.id>? ORDER BY c.id ASC LIMIT 100", (after,))
     else:
-        rows = db.q("SELECT * FROM (SELECT * FROM chat ORDER BY id DESC LIMIT 60) ORDER BY id ASC")
+        rows = db.q("SELECT * FROM (" + sel + " ORDER BY c.id DESC LIMIT 60) ORDER BY id ASC")
     return [
         {"id": r["id"], "name": r["name"], "text": r["text"], "created": r["created"],
-         "mine": r["user_id"] == u["tg_id"]}
+         "mine": r["user_id"] == u["tg_id"], "driver": bool(r["drv"])}
         for r in rows
     ]
 
@@ -1078,8 +1077,6 @@ async def chat_get(request: Request, after: int = 0):
 @app.post("/api/chat")
 async def chat_post(request: Request):
     u = auth(request)
-    if not u["is_driver"]:
-        raise HTTPException(403, "Чат только для водителей")
     if debt(u["tg_id"]) >= DEBT_LIMIT:
         raise HTTPException(403, "Чат закрыт до оплаты комиссии")
     b = await request.json()

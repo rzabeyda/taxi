@@ -24,7 +24,7 @@ const IC = {
   wallet: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
 };
 const TABS = {
-  client: [['Заказ', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
+  client: [['Заказ', IC.car], ['Чат', IC.chat], ['Профиль', IC.user]],
   driver: [['Заказы', IC.car], ['Чат', IC.chat], ['Профиль', IC.user]],
 };
 
@@ -130,7 +130,7 @@ async function render(force) {
   const v = $('#view');
   try {
     let html;
-    if (S.role === 'client') html = await [clientOrder, clientHistory, clientCabinet][S.tab]();
+    if (S.role === 'client') html = await [clientOrder, driverChat, clientCabinet][S.tab]();
     else if (!S.st.me.is_driver) html = S.tab === 0 ? driverRegister() : '<div class="card center muted">Сначала зарегистрируйтесь на вкладке «Заказы»</div>';
     else html = await [driverOrders, driverChat, driverCabinet][S.tab]();
     if (key !== S.key) return; // superseded
@@ -210,6 +210,18 @@ async function clientForm() {
   <button class="btn" id="f_ok" style="font-size:18px;padding:16px">OK</button>`;
 }
 
+async function openCTrips() {
+  const html = await clientHistory();
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><div class="name" style="margin-bottom:6px">Поездки</div>${html}<button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+  m.querySelectorAll('[data-fav]').forEach((el) => (el.onclick = async () => {
+    try { await api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' }); } catch (e) { toast(e.message); }
+    openCTrips();
+  }));
+}
 async function clientHistory() {
   const rows = await api('history?role=client');
   if (!rows.length) return '<div class="card center muted">Поездок пока нет</div>';
@@ -222,7 +234,7 @@ async function clientCabinet() {
   const spent = rows.reduce((a, o) => a + o.price, 0);
   return `<div class="card glow prof">${avatar(null, S.st.me.name)}<div class="pinfo"><div class="name">${esc(S.st.me.name)}</div></div></div>
     <div class="pills">
-      <div class="pill dim"><span>Поездки</span><b>${rows.length}</b></div>
+      <div class="pill" data-ctrips="1"><span>Поездки</span><b>${rows.length}</b></div>
       <div class="pill dim"><span>Потрачено</span><b>${eur(spent)}</b></div>
       <div class="pill gold dim"><span>Избранные</span><b>${favs.length}</b></div>
     </div>
@@ -388,7 +400,7 @@ async function openDm(peer, nameHint) {
 }
 
 let chatLast = 0;
-const msgHtml = (m) => `<div class="msg ${m.mine ? 'mine' : ''}"><div class="mn">${m.mine ? 'Вы' : esc(m.name)}</div><div>${esc(m.text)}</div><div class="mt">${new Date(m.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`;
+const msgHtml = (m) => `<div class="msg ${m.mine ? 'mine' : ''}"><div class="mn">${m.mine ? 'Вы' : esc(m.name)}${m.driver ? ' 🚕' : ''}</div><div>${esc(m.text)}</div><div class="mt">${new Date(m.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`;
 async function driverChat() {
   if (S.st.me.blocked) return blockedHtml(S.st.me);
   const rows = await api('chat');
@@ -398,7 +410,7 @@ async function driverChat() {
 }
 async function pollChat(scroll) {
   const list = $('#chatlist');
-  if (!list || S.role !== 'driver' || S.tab !== 1) return;
+  if (!list || S.tab !== 1) return;
   try {
     const rows = await api('chat?after=' + chatLast);
     if (!rows.length) return;
@@ -567,6 +579,7 @@ function bind() {
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
   on('[data-clients]', () => openClients());
+  on('[data-ctrips]', () => openCTrips());
   on('[data-dm]', (el) => openDm(+el.dataset.dm));
   on('[data-cfav]', (el) => act(() => api('driver/clients', { client_id: +el.dataset.cfav, on: el.dataset.on === '1' })));
   on('[data-rad]', (el) => act(() => api('driver/radius', { km: el.dataset.rad ? +el.dataset.rad : null })));
