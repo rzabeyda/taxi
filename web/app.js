@@ -210,6 +210,22 @@ async function clientForm() {
   <button class="btn" id="f_ok" style="font-size:18px;padding:16px">OK</button>`;
 }
 
+function openReport() {
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet"><div class="name" style="margin-bottom:8px">Пожаловаться</div>
+    <label>Опишите проблему</label><textarea id="rp_text" rows="5" maxlength="1000" placeholder="Что случилось?"></textarea>
+    <div style="height:14px"></div><button class="btn" id="rp_ok">Отправить</button>
+    <div style="height:10px"></div><button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+  $('#rp_ok').onclick = async () => {
+    const btn = $('#rp_ok'); btn.disabled = true;
+    try { await api('report', { text: $('#rp_text').value, role: S.role }); m.classList.add('hidden'); toast('Жалоба отправлена'); }
+    catch (e) { toast(e.message); btn.disabled = false; }
+  };
+}
+
 async function openCTrips() {
   const html = await clientHistory();
   const m = $('#modal');
@@ -238,6 +254,7 @@ async function clientCabinet() {
       <div class="pill dim"><span>Потрачено</span><b>${eur(spent)}</b></div>
       <div class="pill gold dim"><span>Избранные</span><b>${favs.length}</b></div>
     </div>
+    <button class="btn sm danger" data-report="1" style="margin-bottom:6px">Пожаловаться</button>
     ${favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
     ${f.loc ? `<a class="btn sm" style="width:auto" href="https://www.google.com/maps/search/?api=1&query=${f.loc.lat},${f.loc.lng}" target="_blank">Где находится${f.loc.min > 0 ? ' · ' + f.loc.min + ' мин назад' : ''}</a>` : ''}
@@ -443,7 +460,8 @@ async function driverCabinet() {
       <div class="pill dim"><span>Дни</span><b>${s.work_days}</b></div>
       <div class="pill ${me.allow_rating ? 'green' : 'red'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
       <div class="pill" data-clients="1" style="grid-column:1/-1"><span>Клиенты</span><b>${s.clients}</b></div>
-    </div>`;
+    </div>
+    <button class="btn sm danger" data-report="1">Пожаловаться</button>`;
 }
 
 function copyText(t) {
@@ -580,6 +598,7 @@ function bind() {
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
   on('[data-clients]', () => openClients());
+  on('[data-report]', () => openReport());
   on('[data-ctrips]', () => openCTrips());
   on('[data-dm]', (el) => openDm(+el.dataset.dm));
   on('[data-cfav]', (el) => act(() => api('driver/clients', { client_id: +el.dataset.cfav, on: el.dataset.on === '1' })));

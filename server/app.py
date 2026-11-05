@@ -866,6 +866,29 @@ async def order_rate(oid: int, request: Request):
     return {"ok": True}
 
 
+_last_report = {}
+
+
+@app.post("/api/report")
+async def report_post(request: Request):
+    u = auth(request)
+    b = await request.json()
+    text = str(b.get("text", "")).strip()[:1000]
+    role = "водитель" if b.get("role") == "driver" and u["is_driver"] else "клиент"
+    if len(text) < 5:
+        raise HTTPException(400, "Опишите проблему подробнее")
+    if time.time() - _last_report.get(u["tg_id"], 0) < 30:
+        raise HTTPException(429, "Подождите немного перед следующей жалобой")
+    _last_report[u["tg_id"]] = time.time()
+    db.x("INSERT INTO reports(user_id,role,text,created) VALUES(?,?,?,?)", (u["tg_id"], role, text, now()))
+    uname = f" @{u['username']}" if u["username"] else ""
+    for a in ADMIN_IDS:
+        asyncio.create_task(
+            notify(a, f"⚠️ Жалоба\n{u['name']}{uname} ({role}, id {u['tg_id']}):\n{text}")
+        )
+    return {"ok": True}
+
+
 _last_dm = {}
 
 
@@ -1133,6 +1156,23 @@ async def cmd_admin(m: Message):
     await m.answer(
         f"Пользователей: {us}\nВодителей: {dr}\nПоездок: {s['n']}\nОборот: {money(s['g'])} €\n"
         f"Комиссия всего: {money(s['c'])} €\nВодители должны: {money(owed)} €"
+    )
+
+
+@dp.message(Command("reports"))
+async def cmd_reports(m: Message):
+    if m.from_user.id not in ADMIN_IDS:
+        return
+    rows = db.q(
+        "SELECT r.*, u.name, u.username FROM reports r LEFT JOIN users u ON u.tg_id=r.user_id ORDER BY r.id DESC LIMIT 10"
+    )
+    if not rows:
+        return await m.answer("Жалоб нет")
+    await m.answer(
+        "\n\n".join(
+            f"#{r['id']} {r['name']}{' @' + r['username'] if r['username'] else ''} ({r['role']}, id {r['user_id']}):\n{r['text']}"
+            for r in rows
+        )[:4000]
     )
 
 
