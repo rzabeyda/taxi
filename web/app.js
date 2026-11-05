@@ -270,11 +270,11 @@ async function driverOrders() {
   h += `<div class="card ${me.online ? 'neon-g' : 'neon-r'}"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
     <div class="muted small-t">${me.online ? 'Вам приходят новые заказы' : 'Включите, чтобы получать заказы'}</div></div>
     <div class="switch ${me.online ? 'on' : 'off'}" id="sw"></div></div></div>`;
-  const std = [1, 2, 3, 5, 10];
+  const std = [1, 3, 5];
   const custom = me.radius && !std.includes(me.radius);
-  h += `<div class="card"><div class="row"><span class="name" style="font-size:15px">Радиус заказов</span><span class="muted small-t">от вас</span></div>
-    <div class="chips" style="margin-top:10px"><button class="chip ${!me.radius ? 'on' : ''}" data-rad="">Все</button>${std.map((r) => `<button class="chip ${me.radius === r ? 'on' : ''}" data-rad="${r}">${r} км</button>`).join('')}
-    <input id="rad_c" type="number" inputmode="decimal" step="0.5" min="0.3" placeholder="свой" value="${custom ? me.radius : ''}" style="width:84px;padding:10px;${custom ? 'border-color:#fff' : ''}"></div></div>`;
+  h += `<div class="card" style="padding:12px"><div class="muted small-t" style="margin:0 4px 8px">Радиус заказов</div>
+    <div class="radrow">${std.map((r) => `<button class="chip ${me.radius === r ? 'on' : ''}" data-rad="${r}">${r} км</button>`).join('')}<button class="chip ${!me.radius ? 'on' : ''}" data-rad="">Все</button>
+    <input id="rad_c" class="${custom ? 'on' : ''}" type="number" inputmode="decimal" step="0.5" min="0.3" placeholder="свой" value="${custom ? me.radius : ''}"></div></div>`;
   if (me.blocked) return h + `<div class="card glow"><div class="name red">Приём заказов заблокирован</div><div class="muted" style="margin-top:6px">Долг ${eur(me.debt)}. Оплатите комиссию в Профиле (блок «Комиссия сервису»).</div></div>`;
   if (!me.online) return h;
   const list = st.open_orders || [];

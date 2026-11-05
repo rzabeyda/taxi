@@ -170,3 +170,8 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 .orow .oside{align-self:stretch;justify-content:space-between;align-items:flex-end;min-height:56px}
 .orow .km{font-size:15px;font-weight:700;color:#fff;white-space:nowrap}
 .orow .ot{align-self:auto}
+
+.radrow{display:flex;gap:6px;align-items:stretch}
+.radrow .chip{padding:9px 10px;font-size:14px;flex:none;white-space:nowrap}
+.radrow input{flex:1;min-width:0;padding:9px 8px;font-size:14px;border-radius:14px;text-align:center}
+.radrow input.on{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.6)}
