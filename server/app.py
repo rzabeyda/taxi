@@ -191,6 +191,22 @@ def order_view(o: dict, viewer: int, with_nav=False) -> dict:
         )
     cl = get_user(o["client_id"])
     d["client"] = {"id": cl["tg_id"], "name": cl["name"], "username": cl["username"]}
+    if o["status"] == "open":
+        if o["client_id"] == viewer:
+            offs = db.q(
+                "SELECT f.id, f.price, f.eta, u.tg_id did, u.name, u.car, u.color, u.year, u.plate, u.driver_photo, u.allow_rating "
+                "FROM offers f JOIN users u ON u.tg_id=f.driver_id WHERE f.order_id=? AND f.status='pending' ORDER BY f.id",
+                (o["id"],),
+            )
+            for f in offs:
+                avg, n = driver_rating(f["did"])
+                f["rating"] = avg if (f["allow_rating"] and n) else None
+            d["offers"] = offs
+        else:
+            d["my_offer"] = db.q1(
+                "SELECT price, eta FROM offers WHERE order_id=? AND driver_id=? AND status='pending'",
+                (o["id"], viewer),
+            )
     if o["status"] == "done":
         d["net"] = round(o["price"] - (o["commission"] or 0), 2)
         d["fav"] = bool(
@@ -529,6 +545,7 @@ async def order_accept(oid: int, request: Request):
     if not n:
         raise HTTPException(409, "Заказ уже занят")
     o = get_order(oid)
+    db.x("UPDATE offers SET status='rejected' WHERE order_id=? AND status='pending'", (oid,))
     asyncio.create_task(clear_notifs(oid, "✅ Заказ принят другим водителем"))
     msg = (
         f"✅ Водитель найден\n👤 {u['name']}\n🚗 {car_line(u)} · {u['plate']}\n"
@@ -609,6 +626,7 @@ async def order_cancel(oid: int, request: Request):
     n, _ = db.x("UPDATE orders SET status='cancelled' WHERE id=? AND status='open'", (oid,))
     if not n:
         raise HTTPException(400, "Заказ уже принят водителем, отменить нельзя")
+    db.x("UPDATE offers SET status='rejected' WHERE order_id=? AND status='pending'", (oid,))
     asyncio.create_task(clear_notifs(oid, "❌ Заказ отменён клиентом"))
     return {"ok": True}
 
@@ -797,6 +815,91 @@ async def order_rate(oid: int, request: Request):
     if not n:
         raise HTTPException(400, "Уже оценено")
     asyncio.create_task(notify(o["driver_id"], f"⭐ Клиент поставил оценку: {r} из 5"))
+    return {"ok": True}
+
+
+@app.post("/api/order/{oid}/hide")
+async def order_hide(oid: int, request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Только для водителей")
+    db.x("INSERT OR IGNORE INTO declines(order_id,driver_id) VALUES(?,?)", (oid, u["tg_id"]))
+    return {"ok": True}
+
+
+@app.post("/api/order/{oid}/offer")
+async def order_offer(oid: int, request: Request):
+    u = auth(request)
+    uid = u["tg_id"]
+    if not u["is_driver"]:
+        raise HTTPException(403, "Только для водителей")
+    if debt(uid) >= DEBT_LIMIT:
+        raise HTTPException(403, f"Долг {DEBT_LIMIT:g} € — сначала оплатите комиссию")
+    if is_busy(uid):
+        raise HTTPException(400, "Сначала завершите текущий заказ")
+    b = await request.json()
+    try:
+        price = round(float(b.get("price")), 2)
+        eta = int(b.get("eta"))
+    except Exception:
+        raise HTTPException(400, "Укажите цену и минуты")
+    if not (1 <= price <= 200) or not (1 <= eta <= 90):
+        raise HTTPException(400, "Цена 1–200 €, минуты 1–90")
+    o = get_order(oid)
+    if not o or o["status"] != "open" or (o["client_id"] == uid and not own_ok(uid)):
+        raise HTTPException(409, "Заказ недоступен")
+    if o["target_driver_id"] and o["target_driver_id"] != uid:
+        raise HTTPException(409, "Заказ недоступен")
+    db.x(
+        "INSERT INTO offers(order_id,driver_id,price,eta,status,created) VALUES(?,?,?,?,'pending',?) "
+        "ON CONFLICT(order_id,driver_id) DO UPDATE SET price=excluded.price, eta=excluded.eta, status='pending', created=excluded.created",
+        (oid, uid, price, eta, now()),
+    )
+    asyncio.create_task(
+        notify(o["client_id"], f"💶 {u['name']} предлагает {money(price)} € · {eta} мин", oid)
+    )
+    return {"ok": True}
+
+
+@app.post("/api/offer/{fid}/accept")
+async def offer_accept(fid: int, request: Request):
+    u = auth(request)
+    f = db.q1("SELECT * FROM offers WHERE id=? AND status='pending'", (fid,))
+    if not f:
+        raise HTTPException(409, "Предложение уже недоступно")
+    o = get_order(f["order_id"])
+    if not o or o["client_id"] != u["tg_id"] or o["status"] != "open":
+        raise HTTPException(409, "Заказ недоступен")
+    dr = get_user(f["driver_id"])
+    if debt(dr["tg_id"]) >= DEBT_LIMIT or is_busy(dr["tg_id"]):
+        db.x("UPDATE offers SET status='rejected' WHERE id=?", (fid,))
+        raise HTTPException(409, "Водитель сейчас недоступен")
+    n, _ = db.x(
+        "UPDATE orders SET status='accepted', driver_id=?, eta_min=?, accepted_at=?, price=? WHERE id=? AND status='open'",
+        (dr["tg_id"], f["eta"], now(), f["price"], o["id"]),
+    )
+    if not n:
+        raise HTTPException(409, "Заказ уже занят")
+    db.x("UPDATE offers SET status='accepted' WHERE id=?", (fid,))
+    db.x("UPDATE offers SET status='rejected' WHERE order_id=? AND status='pending'", (o["id"],))
+    asyncio.create_task(clear_notifs(o["id"], "✅ Заказ принят другим водителем"))
+    asyncio.create_task(
+        notify(dr["tg_id"], f"✅ Клиент принял ваше предложение: {money(f['price'])} €", o["id"])
+    )
+    return {"ok": True}
+
+
+@app.post("/api/offer/{fid}/reject")
+async def offer_reject(fid: int, request: Request):
+    u = auth(request)
+    f = db.q1("SELECT * FROM offers WHERE id=? AND status='pending'", (fid,))
+    if not f:
+        return {"ok": True}
+    o = get_order(f["order_id"])
+    if not o or o["client_id"] != u["tg_id"]:
+        raise HTTPException(403, "Нет доступа")
+    db.x("UPDATE offers SET status='rejected' WHERE id=?", (fid,))
+    asyncio.create_task(notify(f["driver_id"], "❌ Клиент отклонил ваше предложение"))
     return {"ok": True}
 
 

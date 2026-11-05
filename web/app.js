@@ -28,7 +28,7 @@ const TABS = {
   driver: [['Заказы', IC.car], ['Чат', IC.chat], ['Профиль', IC.user]],
 };
 
-let S = { ph: {}, role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
+let S = { seen: new Set(), ph: {}, role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
 
 async function api(path, body) {
   const r = await fetch('/api/' + path, {
@@ -154,6 +154,10 @@ async function clientOrder() {
       <div class="big">${eur(o.price)}</div>
       <div class="muted small-t">Повысьте цену, чтобы заказ приняли быстрее</div>
     </div>
+    ${(o.offers || []).length ? '<div class="muted small-t" style="margin:4px 4px 0">Предложения водителей</div>' : ''}
+    ${(o.offers || []).map((f) => `<div class="card glow"><div class="row"><div><div class="name">${esc(f.name)}${f.rating ? ` <span class="gold small-t">★ ${f.rating}</span>` : ''}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
+      <div style="text-align:right"><b style="font-size:26px">${eur(f.price)}</b><div class="muted small-t">${f.eta} мин</div></div></div>
+      <div class="grid2" style="margin-top:10px"><button class="btn sm" data-oacc="${f.id}">Принять</button><button class="btn sm danger" data-orej="${f.id}">Отклонить</button></div></div>`).join('')}
     <div class="grid2"><button class="btn" data-raise="-0.5" ${o.price <= 1 ? 'disabled' : ''}>− 0,5 €</button><button class="btn" data-raise="0.5">+ 0,5 €</button></div>
     <div style="height:10px"></div>
     <button class="btn danger" data-cancel="${o.id}">Отменить заказ</button>`;
@@ -261,10 +265,13 @@ async function driverOrders() {
   const list = st.open_orders || [];
   if (!list.length) return h + '<div class="card center muted pulse">Ждём новые заказы…</div>';
   const sorted = list.slice().sort((p, q) => (q.personal ? 1 : 0) - (p.personal ? 1 : 0));
-  return h + sorted.map((x) => `<div class="orow ${x.personal ? 'personal' : ''}" data-open="${x.id}">
+  const fresh = sorted.filter((x) => !S.seen.has(x.id));
+  sorted.forEach((x) => S.seen.add(x.id));
+  if (fresh.length && tg.HapticFeedback) { try { tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} }
+  return h + sorted.map((x) => `<div class="orow ${x.personal ? 'personal' : ''} ${fresh.includes(x) ? 'new' : ''}" data-open="${x.id}">
     <div class="op"><b>${eur(x.price)}</b>${x.km ? `<span>${x.km} км</span>` : ''}</div>
-    <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${routeHtml(x)}</div>
-    <div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`).join('');
+    <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${x.my_offer ? `<div class="plabel" style="color:var(--gold)">Ваше: ${eur(x.my_offer.price)}</div>` : ''}${routeHtml(x)}</div>
+    <div class="oside"><button class="hide" data-hide="${x.id}">✕</button><div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div></div>`).join('');
 }
 function driverActive(o) {
   const c = o.client;
@@ -437,7 +444,11 @@ async function openOrder(id) {
     <label>Через сколько минут будете у клиента?</label>
     <div class="chips" id="etas">${[3, 5, 10, 15, 20].map((n) => `<button class="chip ${n === 10 ? 'on' : ''}" data-n="${n}">${n}</button>`).join('')}<input id="eta_c" type="number" inputmode="numeric" placeholder="свои" style="width:90px;padding:10px"></div>
     <div style="height:14px"></div>
-    <button class="btn" id="acc">Принять заказ</button>
+    <button class="btn" id="acc">Принять за ${eur(o.price)}</button>
+    <div class="card" style="margin:14px 0 0"><label>Или предложите свою цену</label>
+      <div class="stepper"><button class="btn" id="o_minus">−</button><input id="o_price" type="number" inputmode="decimal" step="0.5" value="${o.my_offer ? o.my_offer.price : o.price}" style="font-size:22px"><button class="btn" id="o_plus">+</button></div>
+      <button class="btn sm gold" id="o_send" style="margin-top:10px">Предложить цену</button>
+      ${o.my_offer ? `<div class="muted small-t center" style="margin-top:8px">Ваше предложение ${eur(o.my_offer.price)}, ждём ответа клиента</div>` : ''}</div>
     <div style="height:10px"></div><button class="btn ghost" id="cl">Закрыть</button></div>`;
   m.classList.remove('hidden');
   m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
@@ -448,6 +459,14 @@ async function openOrder(id) {
     S.eta = +b.dataset.n; $('#eta_c').value = '';
   };
   $('#eta_c').oninput = (e) => { document.querySelectorAll('#etas .chip').forEach((c) => c.classList.remove('on')); S.eta = +e.target.value; };
+  const op = $('#o_price');
+  $('#o_minus').onclick = () => (op.value = Math.max(1, (+op.value || o.price) - 0.5));
+  $('#o_plus').onclick = () => (op.value = (+op.value || o.price) + 0.5);
+  $('#o_send').onclick = async () => {
+    try { await api('order/' + id + '/offer', { price: +op.value, eta: S.eta }); m.classList.add('hidden'); toast('Предложение отправлено'); }
+    catch (e) { toast(e.message); }
+    refresh(true);
+  };
   $('#acc').onclick = async () => {
     try { await api('order/' + id + '/accept', { eta: S.eta }); m.classList.add('hidden'); toast('Заказ ваш'); }
     catch (e) { toast(e.message); m.classList.add('hidden'); }
@@ -467,6 +486,9 @@ function bind() {
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
+  on('[data-oacc]', (el) => act(() => api('offer/' + el.dataset.oacc + '/accept', {})));
+  on('[data-orej]', (el) => act(() => api('offer/' + el.dataset.orej + '/reject', {})));
+  v.querySelectorAll('[data-hide]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); act(() => api('order/' + el.dataset.hide + '/hide', {})); }));
   on('[data-star]', (el) => act(() => api('order/' + el.dataset.oid + '/rate', { rating: +el.dataset.star })));
   const rsw = $('#rsw'); if (rsw) rsw.onclick = () => act(() => api('driver/rating_setting', { on: !S.st.me.allow_rating }));
   on('[data-trips]', () => openTrips());

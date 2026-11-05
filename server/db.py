@@ -83,3 +83,8 @@ for _t, _c in (("users", "allow_rating INTEGER DEFAULT 1"), ("orders", "rating I
         _conn.execute(f"ALTER TABLE {_t} ADD COLUMN {_c}")
     except sqlite3.OperationalError:
         pass
+
+_conn.execute(
+    "CREATE TABLE IF NOT EXISTS offers(id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, driver_id INTEGER, "
+    "price REAL, eta INTEGER, status TEXT, created INTEGER, UNIQUE(order_id, driver_id))"
+)

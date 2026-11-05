@@ -160,3 +160,8 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 .pill.green b{color:var(--green)}
 .pill.red{border-color:var(--red);box-shadow:0 0 6px var(--red),0 0 14px rgba(255,90,110,.35)}
 .pill.red b{color:var(--red)}
+
+@keyframes blink{0%,100%{filter:brightness(1);transform:scale(1)}50%{filter:brightness(2.1);transform:scale(1.025)}}
+.orow.new{animation:blink .9s ease-in-out 6}
+.oside{display:flex;flex-direction:column;align-items:flex-end;gap:6px;align-self:flex-start}
+.hide{background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;width:30px;height:30px;font-size:14px;padding:0}
