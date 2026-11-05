@@ -23,8 +23,8 @@ const IC = {
   wallet: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
 };
 const TABS = {
-  client: [['Заказ', IC.car], ['Поездки', IC.list], ['Кабинет', IC.user]],
-  driver: [['Заказы', IC.car], ['Поездки', IC.list], ['Кабинет', IC.user]],
+  client: [['Заказ', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
+  driver: [['Заказы', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
 };
 
 let S = { role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
