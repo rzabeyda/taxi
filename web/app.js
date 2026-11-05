@@ -366,7 +366,7 @@ async function driverCabinet() {
       ${me.rating_n ? `<span class="rate">★ ${me.rating}</span>` : ''}
     </div>
     <div class="pills">
-      <div class="pill dim"><span>Заработано</span><b class="green">${eur(s.earned)}</b></div>
+      <div class="pill" data-trips="1"><span>Заработано</span><b class="green">${eur(s.earned)}</b></div>
       <div class="pill gold" data-pay="1"><span class="wi">${IC.wallet}</span><b>${eur(s.commission)}</b>${s.debt > 0 ? `<i class="red">− ${eur(s.debt)}</i>` : ''}</div>
       <div class="pill" data-trips="1"><span>Поездки</span><b>${s.count}</b></div>
       <div class="pill dim"><span>Расстояние</span><b>${s.km} км</b></div>
