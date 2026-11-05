@@ -326,7 +326,7 @@ async def state(request: Request, role: str = "client"):
     d = debt(uid) if u["is_driver"] else 0
     out = {
         "me": {
-            "id": uid, "name": u["name"], "is_driver": bool(u["is_driver"]),
+            "id": uid, "name": u["name"], "username": u["username"], "is_driver": bool(u["is_driver"]),
             "online": bool(u["online"]), "car": u["car"], "plate": u["plate"], "phone": u["phone"],
             "debt": d, "limit": DEBT_LIMIT, "blocked": d >= DEBT_LIMIT,
         },
@@ -369,6 +369,8 @@ async def order_get(oid: int, request: Request):
 async def driver_register(request: Request):
     u = auth(request)
     b = await request.json()
+    if not u["username"]:
+        raise HTTPException(400, "Установите @username в настройках Telegram и откройте приложение заново")
     name = " ".join(str(b.get("name", "")).split())[:50]
     if len(name.split()) < 2:
         raise HTTPException(400, "Укажите имя и фамилию")

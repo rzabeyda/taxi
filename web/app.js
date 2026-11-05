@@ -138,7 +138,7 @@ async function clientOrder() {
       <div class="muted small-t">Водитель принял заказ</div>
       <div class="big" data-eta='${esc(JSON.stringify({ accepted_at: o.accepted_at, eta_min: o.eta_min, arrived_at: o.arrived_at, picked_at: o.picked_at }))}' style="font-size:26px">${etaText(o)}</div>
       <div class="name" style="margin-top:12px">${esc(d.name)}</div>
-      <div class="muted">${esc(d.car)}</div>
+      <div class="muted">${esc(d.car)}${d.username ? ' · @' + esc(d.username) : ''}</div>
       <div class="big" style="font-size:28px;letter-spacing:2px">${esc(d.plate)}</div>
     </div>
     <div class="card">${routeHtml(o)}<div class="row"><b>${eur(o.price)}</b>${kmTag(o)}</div></div>
@@ -189,7 +189,9 @@ async function clientCabinet() {
 
 /* ---------------------------------------------------------------- driver */
 function driverRegister() {
-  return `<div class="card"><div class="name">Стать водителем</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
+  const un = S.st.me.username;
+  return `<div class="card"><div class="name">Стать водителем</div>
+    <div class="${un ? 'muted' : 'red'} small-t" style="margin:6px 0">${un ? 'Ваш Telegram: @' + esc(un) + ' (клиент сможет вам написать)' : 'У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.'}</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
     <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
     <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
     <div style="height:10px"></div><label>Марка и цвет авто</label><input id="r_car" placeholder="Toyota Prius, белая">
@@ -228,7 +230,7 @@ function driverActive(o) {
     <div class="big" style="font-size:26px;margin-top:6px" data-eta='${esc(JSON.stringify({ accepted_at: o.accepted_at, eta_min: o.eta_min, arrived_at: o.arrived_at, picked_at: o.picked_at }))}'>${etaText(o)}</div>
     ${routeHtml(o)}
     <div class="row"><b style="font-size:24px">${eur(o.price)}</b><span class="muted small-t">вам ≈ ${eur(net)}</span></div>
-    <div class="muted small-t" style="margin-top:6px">Клиент: ${esc(c.name)}</div>
+    <div class="muted small-t" style="margin-top:6px">Клиент: ${esc(c.name)}${c.username ? ' · @' + esc(c.username) : ''}</div>
   </div>
   <div class="grid2">
     <a class="btn sm" href="${o.nav.gm_full}" target="_blank">Google: весь маршрут</a>
@@ -256,7 +258,7 @@ async function driverCabinet() {
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat"><span class="muted small-t">Оборот</span><b>${eur(s.gross)}</b></div>
     <div class="stat"><span class="muted small-t">Отдано сервису</span><b>${eur(s.commission)}</b></div></div>
-    <div class="card"><div class="name">${esc(me.name)}</div><div class="muted">${esc(me.car)} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
+    <div class="card"><div class="name">${esc(me.name)}${me.username ? ' <span class="muted">@' + esc(me.username) + '</span>' : ''}</div><div class="muted">${esc(me.car)} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Баланс</div>
     ${await driverBalance()}`;
 }
