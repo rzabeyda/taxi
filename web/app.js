@@ -253,9 +253,9 @@ async function driverOrders() {
     }
   }
   if (o && o.status === 'accepted') return driverActive(o);
-  h += `<div class="card"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
+  h += `<div class="card ${me.online ? 'neon-g' : 'neon-r'}"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
     <div class="muted small-t">${me.online ? 'Вам приходят новые заказы' : 'Включите, чтобы получать заказы'}</div></div>
-    <div class="switch ${me.online ? 'on' : ''}" id="sw"></div></div></div>`;
+    <div class="switch ${me.online ? 'on' : 'off'}" id="sw"></div></div></div>`;
   if (me.blocked) return h + `<div class="card glow"><div class="name red">Приём заказов заблокирован</div><div class="muted" style="margin-top:6px">Долг ${eur(me.debt)}. Оплатите комиссию в Профиле (блок «Комиссия сервису»).</div></div>`;
   if (!me.online) return h;
   const list = st.open_orders || [];
@@ -342,7 +342,7 @@ async function driverCabinet() {
       <div class="pill" data-trips="1"><span>Поездки</span><b>${s.count}</b></div>
       <div class="pill dim"><span>Расстояние</span><b>${s.km} км</b></div>
       <div class="pill dim"><span>Дней работает</span><b>${s.work_days}</b></div>
-      <div class="pill ${me.allow_rating ? 'pink' : 'dim'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
+      <div class="pill ${me.allow_rating ? 'green' : 'red'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
     </div>`;
 }
 

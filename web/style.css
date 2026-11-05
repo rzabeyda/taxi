@@ -149,3 +149,14 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 
 .pill .wi{display:flex;justify-content:center;height:16px}
 .pill .wi svg{width:18px;height:18px;stroke:var(--gold);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.neon-g{border:1.5px solid var(--green)!important;box-shadow:0 0 6px var(--green),0 0 18px rgba(46,204,113,.45),inset 0 0 12px rgba(46,204,113,.1)!important}
+.neon-r{border:1.5px solid var(--red)!important;box-shadow:0 0 6px var(--red),0 0 18px rgba(255,90,110,.45),inset 0 0 12px rgba(255,90,110,.1)!important}
+.switch.on{border-color:var(--green);box-shadow:0 0 8px var(--green),0 0 16px rgba(46,204,113,.4)}
+.switch.on::after{background:var(--green);box-shadow:0 0 10px var(--green)}
+.switch.off{border-color:var(--red);box-shadow:0 0 8px var(--red),0 0 16px rgba(255,90,110,.4)}
+.switch.off::after{background:var(--red);box-shadow:0 0 10px var(--red)}
+.pill.green{border-color:var(--green);box-shadow:0 0 6px var(--green),0 0 14px rgba(46,204,113,.35)}
+.pill.green b{color:var(--green)}
+.pill.red{border-color:var(--red);box-shadow:0 0 6px var(--red),0 0 14px rgba(255,90,110,.35)}
+.pill.red b{color:var(--red)}
