@@ -1,0 +1,13 @@
+[Unit]
+Description=Taxi Telegram bot + mini app
+After=network.target
+
+[Service]
+WorkingDirectory=/root/taxi/server
+EnvironmentFile=/root/taxi/.env
+ExecStart=/usr/local/bin/uvicorn app:app --host 127.0.0.1 --port 8050
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
