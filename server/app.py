@@ -731,11 +731,16 @@ async def history(request: Request, role: str = "client"):
 async def favorites(request: Request):
     u = auth(request)
     rows = db.q(
-        "SELECT u.tg_id id, u.name, u.car, u.color, u.year, u.plate, u.online, "
+        "SELECT u.tg_id id, u.name, u.car, u.color, u.year, u.plate, u.online, u.lat, u.lng, u.loc_ts, "
         "EXISTS(SELECT 1 FROM driver_clients dc WHERE dc.driver_id=f.driver_id AND dc.client_id=f.client_id) mutual FROM favorites f "
         "JOIN users u ON u.tg_id=f.driver_id WHERE f.client_id=?",
         (u["tg_id"],),
     )
+    for r in rows:
+        # location is shared only while the driver is on the line and the fix is fresh
+        fresh = r["online"] and r["loc_ts"] and r["lat"] is not None and now() - r["loc_ts"] < 600
+        r["loc"] = {"lat": r["lat"], "lng": r["lng"], "min": (now() - r["loc_ts"]) // 60} if fresh else None
+        del r["lat"], r["lng"], r["loc_ts"]
     return rows
 
 

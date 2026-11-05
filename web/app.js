@@ -240,6 +240,7 @@ async function clientCabinet() {
     </div>
     ${favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
+    ${f.loc ? `<a class="btn sm" style="width:auto" href="https://www.google.com/maps/search/?api=1&query=${f.loc.lat},${f.loc.lng}" target="_blank">Где находится${f.loc.min > 0 ? ' · ' + f.loc.min + ' мин назад' : ''}</a>` : ''}
     ${f.mutual ? `<button class="btn sm" style="width:auto" data-dm="${f.id}">Сообщения</button>` : ''}<button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')}`;
 }
 
@@ -695,4 +696,7 @@ function syncGeo() {
     } catch (e) {}
   }
   setInterval(() => refresh(false), 3000);
+  setInterval(() => {
+    if (S.role === 'client' && S.tab === 2 && $('#modal').classList.contains('hidden')) { S.key = ''; render(true); }
+  }, 15000);
 })();
