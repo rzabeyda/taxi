@@ -740,6 +740,41 @@ async def driver_pay(request: Request):
     return {"ok": True, "amount": d}
 
 
+_last_chat = {}
+
+
+@app.get("/api/chat")
+async def chat_get(request: Request, after: int = 0):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Чат только для водителей")
+    if after > 0:
+        rows = db.q("SELECT * FROM chat WHERE id>? ORDER BY id ASC LIMIT 100", (after,))
+    else:
+        rows = db.q("SELECT * FROM (SELECT * FROM chat ORDER BY id DESC LIMIT 60) ORDER BY id ASC")
+    return [
+        {"id": r["id"], "name": r["name"], "text": r["text"], "created": r["created"],
+         "mine": r["user_id"] == u["tg_id"]}
+        for r in rows
+    ]
+
+
+@app.post("/api/chat")
+async def chat_post(request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Чат только для водителей")
+    b = await request.json()
+    text = str(b.get("text", "")).strip()[:500]
+    if not text:
+        raise HTTPException(400, "Пустое сообщение")
+    if time.time() - _last_chat.get(u["tg_id"], 0) < 1:
+        raise HTTPException(429, "Не так быстро")
+    _last_chat[u["tg_id"]] = time.time()
+    db.x("INSERT INTO chat(user_id,name,text,created) VALUES(?,?,?,?)", (u["tg_id"], u["name"], text, now()))
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------- bot
 _welcome_file_id = None
 

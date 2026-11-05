@@ -20,11 +20,12 @@ const IC = {
   list: '<svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
   user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>',
+  chat: '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
   wallet: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
 };
 const TABS = {
   client: [['Заказ', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
-  driver: [['Заказы', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
+  driver: [['Заказы', IC.car], ['Чат', IC.chat], ['Профиль', IC.user]],
 };
 
 let S = { ph: {}, role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
@@ -105,7 +106,7 @@ function viewKey() {
   } else {
     k.d = st.me.is_driver;
     if (S.tab === 0) { k.o = st.driver_order; k.on = st.me.online; k.b = st.me.blocked; k.l = (st.open_orders || []).map((o) => o.id + ':' + o.price); }
-    else k.debt = st.me.debt;
+    else if (S.tab === 2) k.debt = st.me.debt;
   }
   return JSON.stringify(k);
 }
@@ -120,7 +121,7 @@ async function render(force) {
     let html;
     if (S.role === 'client') html = await [clientOrder, clientHistory, clientCabinet][S.tab]();
     else if (!S.st.me.is_driver) html = S.tab === 0 ? driverRegister() : '<div class="card center muted">Сначала зарегистрируйтесь на вкладке «Заказы»</div>';
-    else html = await [driverOrders, driverTrips, driverCabinet][S.tab]();
+    else html = await [driverOrders, driverChat, driverCabinet][S.tab]();
     if (key !== S.key) return; // superseded
     v.innerHTML = html;
     bind();
@@ -285,10 +286,44 @@ function driverActive(o) {
   <div class="muted small-t center" style="padding:14px 0">Поездка завершится сама, когда вы приедете на место (держите приложение открытым).</div>`;
 }
 
-async function driverTrips() {
+async function openTrips() {
   const hist = await api('history?role=driver');
-  return hist.length ? hist.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>${routeHtml(o)}
-      <div class="muted small-t">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>`).join('') : '<div class="card center muted">Поездок пока нет</div>';
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><div class="name" style="margin-bottom:6px">Поездки</div>
+    ${hist.length ? hist.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>${routeHtml(o)}
+      <div class="muted small-t">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>`).join('') : '<div class="card center muted">Поездок пока нет</div>'}
+    <button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+}
+
+let chatLast = 0;
+const msgHtml = (m) => `<div class="msg ${m.mine ? 'mine' : ''}"><div class="mn">${m.mine ? 'Вы' : esc(m.name)}</div><div>${esc(m.text)}</div><div class="mt">${new Date(m.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div>`;
+async function driverChat() {
+  const rows = await api('chat');
+  chatLast = rows.length ? rows[rows.length - 1].id : 0;
+  return `<div id="chatlist" class="chatlist">${rows.length ? rows.map(msgHtml).join('') : '<div class="muted center" id="chatempty">Сообщений пока нет</div>'}</div>
+    <div class="chatbar"><input id="chat_in" placeholder="Сообщение" maxlength="500" autocomplete="off"><button class="btn" id="chat_send" style="width:56px;padding:0">➤</button></div>`;
+}
+async function pollChat(scroll) {
+  const list = $('#chatlist');
+  if (!list || S.role !== 'driver' || S.tab !== 1) return;
+  try {
+    const rows = await api('chat?after=' + chatLast);
+    if (!rows.length) return;
+    const e = $('#chatempty'); if (e) e.remove();
+    const near = window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
+    list.insertAdjacentHTML('beforeend', rows.map(msgHtml).join(''));
+    chatLast = rows[rows.length - 1].id;
+    if (scroll || near) window.scrollTo(0, document.body.scrollHeight);
+  } catch (e) {}
+}
+setInterval(() => pollChat(false), 2500);
+async function sendChat() {
+  const i = $('#chat_in'); const text = i.value.trim(); if (!text) return;
+  i.value = '';
+  try { await api('chat', { text }); await pollChat(true); } catch (e) { toast(e.message); i.value = text; }
 }
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
@@ -297,7 +332,7 @@ async function driverCabinet() {
     <div class="stats">
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat" data-pay="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b><span class="small-t ${s.debt > 0 ? 'red' : 'muted'}">${s.debt > 0 ? 'Долг ' + eur(s.debt) : 'Оплата'}</span></div>
-    <div class="stat"><span class="muted small-t">Поездки</span><b>${s.count}</b></div>
+    <div class="stat" data-trips="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Поездки</span><b>${s.count}</b></div>
     <div class="stat"><span class="muted small-t">Расстояние</span><b>${s.km} км</b></div>
     <div class="stat" style="grid-column:1/-1"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b></div></div>`;
 }
@@ -407,6 +442,8 @@ function bind() {
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
+  on('[data-trips]', () => openTrips());
+  const cs = $('#chat_send'); if (cs) { cs.onclick = sendChat; $('#chat_in').onkeydown = (e) => { if (e.key === 'Enter') sendChat(); }; window.scrollTo(0, document.body.scrollHeight); }
   on('[data-pay]', () => openPay());
   on('[data-picked]', (el) => act(() => api('order/' + el.dataset.picked + '/picked', {})));
   on('[data-complete]', async (el) => { if (await ask('Завершить поездку?')) act(() => api('order/' + el.dataset.complete + '/complete', {})); });

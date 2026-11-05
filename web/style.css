@@ -99,3 +99,9 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 
 .avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:var(--glow);flex:none;
   display:flex;align-items:center;justify-content:center;font:800 26px inherit;background:#111;color:#fff}
+
+.chatlist{display:flex;flex-direction:column;gap:8px;padding-bottom:100px}
+.msg{max-width:82%;background:#161619;border:1px solid var(--line);border-radius:16px;padding:8px 12px;align-self:flex-start;word-break:break-word}
+.msg.mine{align-self:flex-end;border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.35)}
+.mn{font-size:12px;color:var(--muted)} .mt{font-size:11px;color:var(--muted);text-align:right}
+.chatbar{position:fixed;left:14px;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));max-width:532px;margin:0 auto;display:flex;gap:8px;z-index:9}
