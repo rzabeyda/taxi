@@ -661,7 +661,7 @@ async def driver_pay(request: Request):
     for a in ADMIN_IDS:
         try:
             await bot.send_message(
-                a, f"💶 Водитель {u['name']} ({u['car']} {u['plate']}) оплатил {money(d)} €. Подтвердить?",
+                a, f"{u['name']} оплатил {money(d)} €",
                 reply_markup=kb,
             )
         except Exception as e:
