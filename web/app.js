@@ -224,10 +224,10 @@ function driverRegister() {
     <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="r_color" placeholder="белый"></div>
     <div><label>Год</label><input id="r_year" type="number" inputmode="numeric" placeholder="2015"></div></div>
     <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
-    <div style="height:10px"></div><label>Телефон (по желанию)</label><input id="r_phone" type="tel" placeholder="+372 …">
+    <div style="height:10px"></div><label>Телефон</label><input id="r_phone" type="tel" placeholder="+372 …">
     <div class="grid2" style="margin-top:14px">
-      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="n_car">по желанию</span><input type="file" accept="image/*" id="r_carph" hidden></label>
-      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="n_drv">по желанию</span><input type="file" accept="image/*" id="r_drvph" hidden></label></div></div>
+      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="n_car"></span><input type="file" accept="image/*" id="r_carph" hidden></label>
+      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="n_drv"></span><input type="file" accept="image/*" id="r_drvph" hidden></label></div></div>
   <button class="btn" id="r_ok">Зарегистрироваться</button>`;
 }
 
