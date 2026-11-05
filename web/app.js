@@ -17,7 +17,7 @@ const IC = {
 };
 const TABS = {
   client: [['Заказ', IC.car], ['Поездки', IC.list], ['Кабинет', IC.user]],
-  driver: [['Заказы', IC.car], ['Баланс', IC.wallet], ['Кабинет', IC.user]],
+  driver: [['Заказы', IC.car], ['Поездки', IC.list], ['Кабинет', IC.user]],
 };
 
 let S = { role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
@@ -95,7 +95,7 @@ async function render(force) {
     let html;
     if (S.role === 'client') html = await [clientOrder, clientHistory, clientCabinet][S.tab]();
     else if (!S.st.me.is_driver) html = S.tab === 0 ? driverRegister() : '<div class="card center muted">Сначала зарегистрируйтесь на вкладке «Заказы»</div>';
-    else html = await [driverOrders, driverBalance, driverCabinet][S.tab]();
+    else html = await [driverOrders, driverTrips, driverCabinet][S.tab]();
     if (key !== S.key) return; // superseded
     v.innerHTML = html;
     bind();
@@ -244,18 +244,21 @@ function driverActive(o) {
   <div class="muted small-t center" style="padding:14px 0">Поездка завершится сама, когда вы приедете на место (держите приложение открытым).</div>`;
 }
 
+async function driverTrips() {
+  const hist = await api('history?role=driver');
+  return hist.length ? hist.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>${routeHtml(o)}
+      <div class="muted small-t">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>`).join('') : '<div class="card center muted">Поездок пока нет</div>';
+}
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
-  const hist = await api('history?role=driver');
   return `<div class="stats">
     <div class="stat"><span class="muted small-t">Поездок</span><b>${s.count}</b></div>
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat"><span class="muted small-t">Оборот</span><b>${eur(s.gross)}</b></div>
     <div class="stat"><span class="muted small-t">Отдано сервису</span><b>${eur(s.commission)}</b></div></div>
     <div class="card"><div class="name">${esc(me.name)}</div><div class="muted">${esc(me.car)} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
-    <div class="muted small-t" style="margin:16px 4px 0">История</div>
-    ${hist.length ? hist.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>${routeHtml(o)}
-      <div class="muted small-t">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>`).join('') : '<div class="card center muted">Пока пусто</div>'}`;
+    <div class="muted small-t" style="margin:16px 4px 0">Баланс</div>
+    ${await driverBalance()}`;
 }
 async function driverBalance() {
   const s = await api('driver/stats');
