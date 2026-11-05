@@ -205,14 +205,15 @@ async function clientHistory() {
 async function clientCabinet() {
   const [rows, favs] = await Promise.all([api('history?role=client'), api('favorites')]);
   const spent = rows.reduce((a, o) => a + o.price, 0);
-  return `<div class="card glow"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(null, S.st.me.name)}<div><div class="name" style="font-size:20px">${esc(S.st.me.name)}</div></div></div></div>
-    <div class="stats"><div class="stat"><span class="muted small-t">Поездок</span><b>${rows.length}</b></div>
-    <div class="stat"><span class="muted small-t">Потрачено</span><b>${eur(spent)}</b></div></div>
-    <div class="muted small-t" style="margin:16px 4px 0">Избранные водители</div>
-    ${favs.length ? favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
+  return `<div class="card glow prof">${avatar(null, S.st.me.name)}<div class="pinfo"><div class="name">${esc(S.st.me.name)}</div></div></div>
+    <div class="pills">
+      <div class="pill dim"><span>Поездки</span><b>${rows.length}</b></div>
+      <div class="pill dim"><span>Потрачено</span><b>${eur(spent)}</b></div>
+      <div class="pill gold dim"><span>Избранные</span><b>${favs.length}</b></div>
+    </div>
+    ${favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
-    <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')
-    : '<div class="card center muted">Добавьте водителя в избранное после поездки</div>'}`;
+    <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')}`;
 }
 
 /* ---------------------------------------------------------------- driver */
@@ -330,32 +331,52 @@ async function sendChat() {
 }
 async function driverCabinet() {
   const s = await api('driver/stats'), me = S.st.me;
-  return `<div class="card glow" data-edit="1" style="cursor:pointer"><div class="row" style="justify-content:flex-start;gap:14px">${avatar(me.driver_photo, me.name)}<div><div class="name" style="font-size:20px">${esc(me.name)}</div>
-    ${me.rating_n ? `<div class="gold">★ ${me.rating} <span class="muted small-t">(${me.rating_n})</span></div>` : ''}<div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div></div></div></div>
-    <div class="stats">
-    <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
-    <div class="stat" data-pay="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Комиссия сервису</span><b class="gold">${eur(s.commission)}</b><span class="small-t ${s.debt > 0 ? 'red' : 'muted'}">${s.debt > 0 ? 'Долг ' + eur(s.debt) : 'Оплата'}</span></div>
-    <div class="stat" data-trips="1" style="cursor:pointer;border-color:#fff"><span class="muted small-t">Поездки</span><b>${s.count}</b></div>
-    <div class="stat"><span class="muted small-t">Расстояние</span><b>${s.km} км</b></div>
-    <div class="stat" style="grid-column:1/-1"><span class="muted small-t">Дней работает</span><b>${s.work_days}</b></div></div>
-    <div class="card"><div class="row"><div><div class="name">Оценки клиентов</div><div class="muted small-t">Клиент сможет поставить 1–5 звёзд после поездки</div></div><div class="switch ${me.allow_rating ? 'on' : ''}" id="rsw"></div></div></div>`;
+  return `<div class="card glow prof" data-edit="1">
+      ${avatar(me.driver_photo, me.name)}
+      <div class="pinfo"><div class="name">${esc(me.name)}</div><div class="muted small-t">${esc(carLine(me))} · ${esc(me.plate)}</div></div>
+      ${me.rating_n ? `<span class="rate">★ ${me.rating}</span>` : ''}
+    </div>
+    <div class="pills">
+      <div class="pill dim"><span>Заработано</span><b class="green">${eur(s.earned)}</b></div>
+      <div class="pill gold" data-pay="1"><span>Комиссия</span><b>${eur(s.commission)}</b>${s.debt > 0 ? `<i class="red">долг ${eur(s.debt)}</i>` : ''}</div>
+      <div class="pill" data-trips="1"><span>Поездки</span><b>${s.count}</b></div>
+      <div class="pill dim"><span>Расстояние</span><b>${s.km} км</b></div>
+      <div class="pill dim"><span>Дней работает</span><b>${s.work_days}</b></div>
+      <div class="pill ${me.allow_rating ? 'pink' : 'dim'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
+    </div>`;
 }
 
+function copyText(t) {
+  const done = () => toast('Скопировано');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done));
+  else fallbackCopy(t, done);
+}
+function fallbackCopy(t, done) {
+  const x = document.createElement('textarea'); x.value = t; x.style.position = 'fixed'; x.style.opacity = '0';
+  document.body.appendChild(x); x.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Не удалось скопировать'); }
+  x.remove();
+}
 async function openPay() {
   const s = await api('driver/stats');
   const pct = Math.min(100, Math.round((s.debt / s.limit) * 100));
+  const rows = (s.pay && s.pay.length ? s.pay : []).map((p) => {
+    const raw = p.label === 'Получатель' ? p.value : p.value.replace(/\s/g, '');
+    return `<div class="copyrow" data-copy="${esc(raw)}"><div><span>${esc(p.label)}</span><b>${esc(p.value)}</b></div><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></div>`;
+  }).join('');
   const m = $('#modal');
   m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto">
-    <div class="muted small-t">Долг по комиссии</div><div class="big ${s.debt >= s.limit ? 'red' : ''}">${eur(s.debt)}</div>
-    <div class="bar ${pct >= 80 ? 'warn' : ''}" style="margin:10px 0"><i style="width:${pct}%"></i></div>
-    <div class="muted small-t">Лимит ${eur(s.limit)}: при достижении приём заказов блокируется до оплаты.<br>Комиссия: ${s.pct}% с поездки, минимум ${eur(s.min)}.</div>
-    <div class="card"><div class="name">Как оплатить</div><div class="muted" style="margin-top:6px;white-space:pre-line">${esc(s.pay_info)}</div></div>
+    <div class="row"><div><div class="muted small-t">Долг по комиссии</div><div class="big ${s.debt >= s.limit ? 'red' : ''}" style="font-size:30px">${eur(s.debt)}</div></div>
+      <div class="muted small-t" style="text-align:right">лимит ${eur(s.limit)}<br>${s.pct}% · мин. ${eur(s.min)}</div></div>
+    <div class="bar ${pct >= 80 ? 'warn' : ''}" style="margin:10px 0 14px"><i style="width:${pct}%"></i></div>
+    ${rows || `<div class="muted" style="white-space:pre-line">${esc(s.pay_info)}</div>`}
+    <div class="muted small-t center" style="padding:8px 0 12px">Нажмите на строку, чтобы скопировать</div>
     ${s.pending ? `<div class="card center muted">Заявка на ${eur(s.pending)} отправлена, ждите подтверждения</div>` : ''}
     <button class="btn" id="pay_ok" ${s.debt <= 0 || s.pending ? 'disabled' : ''}>Я оплатил ${s.debt > 0 ? eur(s.debt) : ''}</button>
     <div style="height:10px"></div><button class="btn ghost" id="cl">Закрыть</button></div>`;
   m.classList.remove('hidden');
   m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
   $('#cl').onclick = () => m.classList.add('hidden');
+  m.querySelectorAll('[data-copy]').forEach((el) => (el.onclick = () => copyText(el.dataset.copy)));
   $('#pay_ok').onclick = async () => {
     try { await api('driver/pay', {}); toast('Заявка отправлена'); m.classList.add('hidden'); }
     catch (e) { toast(e.message); }

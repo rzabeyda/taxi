@@ -121,3 +121,28 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
   box-shadow:0 0 6px var(--pink),0 0 18px rgba(255,61,168,.5),inset 0 0 14px rgba(255,61,168,.12)}
 .plabel{font-size:12px;color:var(--pink);font-weight:800;margin-bottom:4px;text-shadow:0 0 8px rgba(255,61,168,.7)}
 .sheet.personal{border-color:var(--pink);box-shadow:0 0 6px var(--pink),0 0 18px rgba(255,61,168,.5)}
+
+.card.prof{display:flex;align-items:center;gap:14px;cursor:pointer;border-radius:26px;padding:14px 16px;
+  background:linear-gradient(180deg,rgba(60,20,55,.55),#0c0c0e)}
+.prof .avatar{width:60px;height:60px}
+.prof .pinfo{flex:1;min-width:0}
+.prof .name{font-size:21px;font-weight:800;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rate{padding:6px 12px;border-radius:999px;background:#fff;color:#000;font-weight:800;font-size:15px;box-shadow:var(--glow)}
+.pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.pill{background:#0b0b0d;border:1.5px solid #fff;border-radius:18px;padding:11px 4px;text-align:center;cursor:pointer;
+  box-shadow:0 0 6px rgba(255,255,255,.7),0 0 14px rgba(255,255,255,.28)}
+.pill span{display:block;font-size:11px;color:var(--muted)}
+.pill b{display:block;font-size:17px;margin-top:3px}
+.pill i{display:block;font-style:normal;font-size:11px;margin-top:1px}
+.pill.dim{border-color:#2f2f35;box-shadow:none;cursor:default}
+.pill.gold{border-color:var(--gold);box-shadow:0 0 6px var(--gold),0 0 14px rgba(255,210,74,.3);cursor:pointer}
+.pill.gold b{color:var(--gold)}
+.pill.gold.dim{box-shadow:none;border-color:#4a4220;cursor:default}
+.pill.pink{border-color:var(--pink);box-shadow:0 0 6px var(--pink),0 0 14px rgba(255,61,168,.4)}
+#rsw.pill.dim{cursor:pointer}
+.copyrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0b0b0d;border:1.5px solid #fff;
+  border-radius:16px;padding:11px 14px;margin:8px 0;cursor:pointer;box-shadow:0 0 6px rgba(255,255,255,.6),0 0 12px rgba(255,255,255,.2)}
+.copyrow:active{transform:scale(.98)}
+.copyrow span{display:block;font-size:11px;color:var(--muted)}
+.copyrow b{display:block;font-size:16px;letter-spacing:.3px;word-break:break-all}
+.copyrow svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;flex:none;stroke-linecap:round;stroke-linejoin:round}

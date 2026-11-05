@@ -39,6 +39,11 @@ COMMISSION_MIN = float(os.getenv("COMMISSION_MIN", "0.5"))
 DEBT_LIMIT = float(os.getenv("DEBT_LIMIT", "10"))
 PAY_INFO = os.getenv("PAY_INFO", "Реквизиты для оплаты уточняйте у администратора.")
 FAV_WAIT = int(os.getenv("FAV_WAIT", "60"))
+PAY_FIELDS = [
+    {"label": lb, "value": os.getenv(env, "")}
+    for lb, env in (("Получатель", "PAY_NAME"), ("IBAN", "PAY_IBAN"), ("BIC", "PAY_BIC"), ("Карта", "PAY_CARD"))
+    if os.getenv(env, "")
+]
 ARRIVE_M = 150  # radius for "arrived" detection, metres
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
@@ -722,7 +727,7 @@ async def driver_stats(request: Request):
         "count": s["n"], "gross": round(s["gross"], 2), "commission": round(s["com"], 2),
         "earned": round(s["gross"] - s["com"], 2), "paid": round(paid, 2),
         "pending": round(pend, 2), "debt": debt(uid), "limit": DEBT_LIMIT,
-        "pay_info": PAY_INFO, "payments": pays, "pct": COMMISSION_PCT, "min": COMMISSION_MIN,
+        "pay_info": PAY_INFO, "pay": PAY_FIELDS, "payments": pays, "pct": COMMISSION_PCT, "min": COMMISSION_MIN,
     }
 
 
