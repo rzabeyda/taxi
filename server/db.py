@@ -88,3 +88,8 @@ _conn.execute(
     "CREATE TABLE IF NOT EXISTS offers(id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, driver_id INTEGER, "
     "price REAL, eta INTEGER, status TEXT, created INTEGER, UNIQUE(order_id, driver_id))"
 )
+
+try:
+    _conn.execute("ALTER TABLE users ADD COLUMN radius_km REAL")
+except sqlite3.OperationalError:
+    pass

@@ -76,6 +76,17 @@ def own_ok(uid: int) -> int:
     return 1 if (SELF_TEST and uid in ADMIN_IDS) else 0
 
 
+def loc_fresh(u: dict) -> bool:
+    return bool(u.get("loc_ts") and u.get("lat") is not None and now() - u["loc_ts"] < 600)
+
+
+def driver_distance_km(u: dict, o: dict):
+    """Distance from driver's fresh location to order pickup, or None if unknown."""
+    if not loc_fresh(u) or o["from_lat"] is None:
+        return None
+    return geo.haversine_m(u["lat"], u["lng"], o["from_lat"], o["from_lng"]) / 1000
+
+
 def driver_rating(driver_id: int):
     r = db.q1(
         "SELECT AVG(rating) a, COUNT(rating) n FROM orders WHERE driver_id=? AND rating IS NOT NULL",
@@ -259,7 +270,7 @@ async def broadcast(oid: int, only: int | None = None, prefix="🚕 Новый �
     if not o or o["status"] != "open":
         return
     drivers = db.q(
-        "SELECT tg_id FROM users WHERE is_driver=1 AND online=1 AND (tg_id!=? OR ?=1)",
+        "SELECT tg_id, radius_km, lat, lng, loc_ts FROM users WHERE is_driver=1 AND online=1 AND (tg_id!=? OR ?=1)",
         (o["client_id"], own_ok(o["client_id"])),
     )
     text = notif_text(o, prefix)
@@ -269,6 +280,10 @@ async def broadcast(oid: int, only: int | None = None, prefix="🚕 Новый �
             continue
         if debt(uid) >= DEBT_LIMIT or is_busy(uid):
             continue
+        if d["radius_km"]:
+            dist = driver_distance_km(d, o)
+            if dist is not None and dist > d["radius_km"]:
+                continue
         if db.q1("SELECT 1 x FROM declines WHERE order_id=? AND driver_id=?", (oid, uid)):
             continue
         try:
@@ -393,7 +408,7 @@ async def state(request: Request, role: str = "client"):
     out = {
         "me": {
             "id": uid, "name": u["name"], "username": u["username"], "is_driver": bool(u["is_driver"]),
-            "allow_rating": bool(u["allow_rating"]), "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "driver_photo": u["driver_photo"], "plate": u["plate"], "phone": u["phone"],
+            "radius": u["radius_km"], "allow_rating": bool(u["allow_rating"]), "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "driver_photo": u["driver_photo"], "plate": u["plate"], "phone": u["phone"],
             "debt": d, "limit": DEBT_LIMIT, "blocked": d >= DEBT_LIMIT,
         },
         "now": now(),
@@ -413,7 +428,15 @@ async def state(request: Request, role: str = "client"):
                 "ORDER BY id DESC LIMIT 30",
                 (uid, own_ok(uid), uid, uid),
             )
-            out["open_orders"] = [order_view(r, uid) for r in rows]
+            res = []
+            for r in rows:
+                dist = driver_distance_km(u, r)
+                if u["radius_km"] and dist is not None and dist > u["radius_km"]:
+                    continue
+                v = order_view(r, uid)
+                v["away"] = round(dist, 1) if dist is not None else None
+                res.append(v)
+            out["open_orders"] = res
         else:
             out["open_orders"] = []
     return out
@@ -815,6 +838,26 @@ async def order_rate(oid: int, request: Request):
     if not n:
         raise HTTPException(400, "Уже оценено")
     asyncio.create_task(notify(o["driver_id"], f"⭐ Клиент поставил оценку: {r} из 5"))
+    return {"ok": True}
+
+
+@app.post("/api/driver/radius")
+async def driver_radius(request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Только для водителей")
+    b = await request.json()
+    km = b.get("km")
+    if km in (None, "", 0):
+        km = None
+    else:
+        try:
+            km = round(float(km), 1)
+        except Exception:
+            raise HTTPException(400, "Неверный радиус")
+        if not (0.3 <= km <= 100):
+            raise HTTPException(400, "Радиус от 0,3 до 100 км")
+    db.x("UPDATE users SET radius_km=? WHERE tg_id=?", (km, u["tg_id"]))
     return {"ok": True}
 
 

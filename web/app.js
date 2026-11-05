@@ -105,7 +105,7 @@ function viewKey() {
     if (S.tab === 0) k.o = st.client_order; else k.o = 0;
   } else {
     k.d = st.me.is_driver;
-    if (S.tab === 0) { k.o = st.driver_order; k.on = st.me.online; k.b = st.me.blocked; k.l = (st.open_orders || []).map((o) => o.id + ':' + o.price); }
+    if (S.tab === 0) { k.o = st.driver_order; k.on = st.me.online; k.rad = st.me.radius; k.b = st.me.blocked; k.l = (st.open_orders || []).map((o) => o.id + ':' + o.price); }
     else if (S.tab === 2) k.debt = st.me.debt;
   }
   return JSON.stringify(k);
@@ -260,6 +260,11 @@ async function driverOrders() {
   h += `<div class="card ${me.online ? 'neon-g' : 'neon-r'}"><div class="row"><div><div class="name">${me.online ? 'На линии' : 'Не на линии'}</div>
     <div class="muted small-t">${me.online ? 'Вам приходят новые заказы' : 'Включите, чтобы получать заказы'}</div></div>
     <div class="switch ${me.online ? 'on' : 'off'}" id="sw"></div></div></div>`;
+  const std = [1, 2, 3, 5, 10];
+  const custom = me.radius && !std.includes(me.radius);
+  h += `<div class="card"><div class="row"><span class="name" style="font-size:15px">Радиус заказов</span><span class="muted small-t">от вас</span></div>
+    <div class="chips" style="margin-top:10px"><button class="chip ${!me.radius ? 'on' : ''}" data-rad="">Все</button>${std.map((r) => `<button class="chip ${me.radius === r ? 'on' : ''}" data-rad="${r}">${r} км</button>`).join('')}
+    <input id="rad_c" type="number" inputmode="decimal" step="0.5" min="0.3" placeholder="свой" value="${custom ? me.radius : ''}" style="width:84px;padding:10px;${custom ? 'border-color:#fff' : ''}"></div></div>`;
   if (me.blocked) return h + `<div class="card glow"><div class="name red">Приём заказов заблокирован</div><div class="muted" style="margin-top:6px">Долг ${eur(me.debt)}. Оплатите комиссию в Профиле (блок «Комиссия сервису»).</div></div>`;
   if (!me.online) return h;
   const list = st.open_orders || [];
@@ -270,7 +275,7 @@ async function driverOrders() {
   if (fresh.length && tg.HapticFeedback) { try { tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} }
   return h + sorted.map((x) => `<div class="orow ${x.personal ? 'personal' : ''} ${fresh.includes(x) ? 'new' : ''}" data-open="${x.id}">
     <div class="op"><b>${eur(x.price)}</b>${x.km ? `<span>${x.km} км</span>` : ''}</div>
-    <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${x.my_offer ? `<div class="plabel" style="color:var(--gold)">Ваше: ${eur(x.my_offer.price)}</div>` : ''}${routeHtml(x)}</div>
+    <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${x.away != null ? `<div class="plabel" style="color:var(--muted);font-weight:600">${x.away} км от вас</div>` : ''}${x.my_offer ? `<div class="plabel" style="color:var(--gold)">Ваше: ${eur(x.my_offer.price)}</div>` : ''}${routeHtml(x)}</div>
     <div class="oside"><button class="hide" data-hide="${x.id}">✕</button><div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div></div>`).join('');
 }
 function driverActive(o) {
@@ -486,6 +491,8 @@ function bind() {
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
+  on('[data-rad]', (el) => act(() => api('driver/radius', { km: el.dataset.rad ? +el.dataset.rad : null })));
+  const rc = $('#rad_c'); if (rc) rc.onchange = () => act(() => api('driver/radius', { km: rc.value ? +rc.value : null }));
   on('[data-oacc]', (el) => act(() => api('offer/' + el.dataset.oacc + '/accept', {})));
   on('[data-orej]', (el) => act(() => api('offer/' + el.dataset.orej + '/reject', {})));
   v.querySelectorAll('[data-hide]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); act(() => api('order/' + el.dataset.hide + '/hide', {})); }));
@@ -536,13 +543,18 @@ function bind() {
 
 /* ---------------------------------------------------------------- geolocation (driver) */
 let geoWatch = null, lastSent = 0;
-function syncGeo() {
+function geoGap() {
   const o = S.st && S.st.driver_order;
-  const need = o && o.status === 'accepted';
+  return o && o.status === 'accepted' ? 8000 : 30000;
+}
+function syncGeo() {
+  const st = S.st; if (!st) return;
+  const o = st.driver_order;
+  const need = (o && o.status === 'accepted') || (st.me.is_driver && st.me.online);
   if (need && geoWatch === null && navigator.geolocation) {
     geoWatch = navigator.geolocation.watchPosition((p) => {
       const t = Date.now();
-      if (t - lastSent < 8000) return;
+      if (t - lastSent < geoGap()) return;
       lastSent = t;
       api('location', { lat: p.coords.latitude, lng: p.coords.longitude }).catch(() => {});
     }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
