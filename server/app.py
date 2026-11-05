@@ -44,6 +44,7 @@ PAY_FIELDS = [
     for lb, env in (("Получатель", "PAY_NAME"), ("IBAN", "PAY_IBAN"), ("BIC", "PAY_BIC"), ("Карта", "PAY_CARD"))
     if os.getenv(env, "")
 ]
+SELF_TEST = os.getenv("SELF_TEST", "0") == "1"  # admin may see/accept own orders (solo testing)
 ARRIVE_M = 150  # radius for "arrived" detection, metres
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
@@ -69,6 +70,10 @@ def debt(driver_id: int) -> float:
         (driver_id,),
     )
     return round(r["d"], 2)
+
+
+def own_ok(uid: int) -> int:
+    return 1 if (SELF_TEST and uid in ADMIN_IDS) else 0
 
 
 def driver_rating(driver_id: int):
@@ -238,7 +243,8 @@ async def broadcast(oid: int, only: int | None = None, prefix="🚕 Новый �
     if not o or o["status"] != "open":
         return
     drivers = db.q(
-        "SELECT tg_id FROM users WHERE is_driver=1 AND online=1 AND tg_id!=?", (o["client_id"],)
+        "SELECT tg_id FROM users WHERE is_driver=1 AND online=1 AND (tg_id!=? OR ?=1)",
+        (o["client_id"], own_ok(o["client_id"])),
     )
     text = notif_text(o, prefix)
     for d in drivers:
@@ -385,11 +391,11 @@ async def state(request: Request, role: str = "client"):
         out["driver_order"] = order_view(do, uid, True) if do else None
         if role == "driver" and u["online"] and d < DEBT_LIMIT and not (do and do["status"] == "accepted"):
             rows = db.q(
-                "SELECT * FROM orders WHERE status='open' AND client_id!=? "
+                "SELECT * FROM orders WHERE status='open' AND (client_id!=? OR ?=1) "
                 "AND (target_driver_id IS NULL OR target_driver_id=?) "
                 "AND id NOT IN (SELECT order_id FROM declines WHERE driver_id=?) "
                 "ORDER BY id DESC LIMIT 30",
-                (uid, uid, uid),
+                (uid, own_ok(uid), uid, uid),
             )
             out["open_orders"] = [order_view(r, uid) for r in rows]
         else:
@@ -517,8 +523,8 @@ async def order_accept(oid: int, request: Request):
         raise HTTPException(400, "Минуты от 1 до 90")
     n, _ = db.x(
         "UPDATE orders SET status='accepted', driver_id=?, eta_min=?, accepted_at=? "
-        "WHERE id=? AND status='open' AND client_id!=? AND (target_driver_id IS NULL OR target_driver_id=?)",
-        (uid, eta, now(), oid, uid, uid),
+        "WHERE id=? AND status='open' AND (client_id!=? OR ?=1) AND (target_driver_id IS NULL OR target_driver_id=?)",
+        (uid, eta, now(), oid, uid, own_ok(uid), uid),
     )
     if not n:
         raise HTTPException(409, "Заказ уже занят")
