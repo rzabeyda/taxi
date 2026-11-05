@@ -228,7 +228,7 @@ async function clientCabinet() {
     </div>
     ${favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
-    <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')}`;
+    ${f.mutual ? `<button class="btn sm" style="width:auto" data-dm="${f.id}">Сообщения</button>` : ''}<button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')}`;
 }
 
 /* ---------------------------------------------------------------- driver */
@@ -341,16 +341,50 @@ async function openClients() {
   const m = $('#modal');
   m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><div class="name" style="margin-bottom:6px">Клиенты</div>
     ${rows.length ? rows.map((c) => `<div class="card"><div class="row"><div><div class="name">${esc(c.name)}</div><div class="muted small-t">${c.username ? '@' + esc(c.username) + ' · ' : ''}поездок: ${c.trips}</div></div>
-      <div class="col" style="align-items:flex-end"><a class="btn sm" style="width:auto" href="${tgLink(c)}" target="_blank">Написать</a>
+      <div class="col" style="align-items:flex-end">${c.mutual ? `<button class="btn sm" style="width:auto" data-dm="${c.id}">Сообщения</button>` : `<a class="btn sm" style="width:auto" href="${tgLink(c)}" target="_blank">Написать</a>`}
       <button class="btn sm danger" style="width:auto" data-crm="${c.id}">Убрать</button></div></div></div>`).join('') : '<div class="card center muted">Добавьте клиента после поездки, и он появится здесь</div>'}
     <button class="btn ghost" id="cl">Закрыть</button></div>`;
   m.classList.remove('hidden');
   m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
   $('#cl').onclick = () => m.classList.add('hidden');
+  m.querySelectorAll('[data-dm]').forEach((el) => (el.onclick = () => openDm(+el.dataset.dm)));
   m.querySelectorAll('[data-crm]').forEach((el) => (el.onclick = async () => {
     try { await api('driver/clients', { client_id: +el.dataset.crm, on: false }); } catch (e) { toast(e.message); }
     openClients();
   }));
+}
+
+let dmTimer = null;
+function closeDm() { if (dmTimer) { clearInterval(dmTimer); dmTimer = null; } $('#modal').classList.add('hidden'); }
+async function openDm(peer, nameHint) {
+  let data;
+  try { data = await api('dm/' + peer); } catch (e) { return toast(e.message); }
+  let last = data.messages.length ? data.messages[data.messages.length - 1].id : 0;
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet"><div class="row" style="margin-bottom:8px"><div class="name">${esc(data.peer.name || nameHint || '')}</div><button class="hide" id="dm_x">✕</button></div>
+    <div id="dmlist" class="dmlist">${data.messages.length ? data.messages.map(msgHtml).join('') : '<div class="muted center" id="dmempty" style="padding:20px 0">Сообщений пока нет</div>'}</div>
+    <div class="row" style="gap:8px;margin-top:10px"><input id="dm_in" placeholder="Сообщение" maxlength="500" autocomplete="off"><button class="btn" id="dm_send" style="width:56px;padding:0">➤</button></div></div>`;
+  m.classList.remove('hidden');
+  const list = $('#dmlist'); list.scrollTop = list.scrollHeight;
+  m.onclick = (e) => { if (e.target === m) closeDm(); };
+  $('#dm_x').onclick = closeDm;
+  const poll = async () => {
+    try {
+      const r = await api('dm/' + peer + '?after=' + last);
+      if (!r.messages.length) return;
+      const em = $('#dmempty'); if (em) em.remove();
+      list.insertAdjacentHTML('beforeend', r.messages.map(msgHtml).join('')); last = r.messages[r.messages.length - 1].id;
+      list.scrollTop = list.scrollHeight;
+    } catch (e) {}
+  };
+  const send = async () => {
+    const i = $('#dm_in'); const text = i.value.trim(); if (!text) return; i.value = '';
+    try { await api('dm/' + peer, { text }); await poll(); } catch (e) { toast(e.message); i.value = text; }
+  };
+  $('#dm_send').onclick = send;
+  $('#dm_in').onkeydown = (e) => { if (e.key === 'Enter') send(); };
+  if (dmTimer) clearInterval(dmTimer);
+  dmTimer = setInterval(poll, 3000);
 }
 
 let chatLast = 0;
@@ -533,6 +567,7 @@ function bind() {
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
   on('[data-clients]', () => openClients());
+  on('[data-dm]', (el) => openDm(+el.dataset.dm));
   on('[data-cfav]', (el) => act(() => api('driver/clients', { client_id: +el.dataset.cfav, on: el.dataset.on === '1' })));
   on('[data-rad]', (el) => act(() => api('driver/radius', { km: el.dataset.rad ? +el.dataset.rad : null })));
   const rc = $('#rad_c'); if (rc) rc.onchange = () => act(() => api('driver/radius', { km: rc.value ? +rc.value : null }));
@@ -631,6 +666,8 @@ function syncGeo() {
 (async function init() {
   drawChrome();
   await refresh(true);
+  const dmq = new URLSearchParams(location.search).get('dm');
+  if (dmq) openDm(parseInt(dmq, 10));
   const q = new URLSearchParams(location.search).get('o') || (tg.initDataUnsafe && tg.initDataUnsafe.start_param);
   if (q && S.st) {
     try {

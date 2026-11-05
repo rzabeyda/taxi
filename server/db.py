@@ -97,3 +97,7 @@ except sqlite3.OperationalError:
 _conn.execute(
     "CREATE TABLE IF NOT EXISTS driver_clients(driver_id INTEGER, client_id INTEGER, PRIMARY KEY(driver_id, client_id))"
 )
+
+_conn.execute(
+    "CREATE TABLE IF NOT EXISTS dm(id INTEGER PRIMARY KEY AUTOINCREMENT, from_id INTEGER, to_id INTEGER, text TEXT, created INTEGER, read INTEGER DEFAULT 0)"
+)

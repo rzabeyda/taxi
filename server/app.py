@@ -76,6 +76,18 @@ def own_ok(uid: int) -> int:
     return 1 if (SELF_TEST and uid in ADMIN_IDS) else 0
 
 
+def mutual(a: int, b: int) -> bool:
+    """True when a client and a driver have added each other to favorites."""
+    return bool(
+        db.q1(
+            "SELECT 1 x FROM favorites f JOIN driver_clients d "
+            "ON d.driver_id=f.driver_id AND d.client_id=f.client_id "
+            "WHERE (f.client_id=? AND f.driver_id=?) OR (f.client_id=? AND f.driver_id=?)",
+            (a, b, b, a),
+        )
+    )
+
+
 def loc_fresh(u: dict) -> bool:
     return bool(u.get("loc_ts") and u.get("lat") is not None and now() - u["loc_ts"] < 600)
 
@@ -719,7 +731,8 @@ async def history(request: Request, role: str = "client"):
 async def favorites(request: Request):
     u = auth(request)
     rows = db.q(
-        "SELECT u.tg_id id, u.name, u.car, u.color, u.year, u.plate, u.online FROM favorites f "
+        "SELECT u.tg_id id, u.name, u.car, u.color, u.year, u.plate, u.online, "
+        "EXISTS(SELECT 1 FROM driver_clients dc WHERE dc.driver_id=f.driver_id AND dc.client_id=f.client_id) mutual FROM favorites f "
         "JOIN users u ON u.tg_id=f.driver_id WHERE f.client_id=?",
         (u["tg_id"],),
     )
@@ -845,6 +858,65 @@ async def order_rate(oid: int, request: Request):
     return {"ok": True}
 
 
+_last_dm = {}
+
+
+@app.get("/api/dm/{peer}")
+async def dm_get(peer: int, request: Request, after: int = 0):
+    u = auth(request)
+    uid = u["tg_id"]
+    if not mutual(uid, peer):
+        raise HTTPException(403, "Личные сообщения доступны, когда вы добавили друг друга")
+    pu = get_user(peer)
+    if after > 0:
+        rows = db.q(
+            "SELECT * FROM dm WHERE ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?)) AND id>? ORDER BY id ASC LIMIT 100",
+            (uid, peer, peer, uid, after),
+        )
+    else:
+        rows = db.q(
+            "SELECT * FROM (SELECT * FROM dm WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) "
+            "ORDER BY id DESC LIMIT 60) ORDER BY id ASC",
+            (uid, peer, peer, uid),
+        )
+    db.x("UPDATE dm SET read=1 WHERE to_id=? AND from_id=?", (uid, peer))
+    return {
+        "peer": {"id": peer, "name": pu["name"] if pu else "?"},
+        "messages": [
+            {"id": r["id"], "text": r["text"], "created": r["created"], "mine": r["from_id"] == uid}
+            for r in rows
+        ],
+    }
+
+
+@app.post("/api/dm/{peer}")
+async def dm_post(peer: int, request: Request):
+    u = auth(request)
+    uid = u["tg_id"]
+    if not mutual(uid, peer):
+        raise HTTPException(403, "Личные сообщения доступны, когда вы добавили друг друга")
+    b = await request.json()
+    text = str(b.get("text", "")).strip()[:500]
+    if not text:
+        raise HTTPException(400, "Пустое сообщение")
+    if time.time() - _last_dm.get(uid, 0) < 1:
+        raise HTTPException(429, "Не так быстро")
+    _last_dm[uid] = time.time()
+    db.x("INSERT INTO dm(from_id,to_id,text,created) VALUES(?,?,?,?)", (uid, peer, text, now()))
+
+    async def push():
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Открыть", web_app=WebAppInfo(url=f"{BASE_URL}/?dm={uid}"))]]
+        )
+        try:
+            await bot.send_message(peer, f"💬 {u['name']}: {text[:200]}", reply_markup=kb)
+        except Exception as e:
+            log.warning("dm notify: %s", e)
+
+    asyncio.create_task(push())
+    return {"ok": True}
+
+
 @app.get("/api/driver/clients")
 async def driver_clients_get(request: Request):
     u = auth(request)
@@ -852,6 +924,7 @@ async def driver_clients_get(request: Request):
         raise HTTPException(403, "Только для водителей")
     return db.q(
         "SELECT c.client_id id, u.name, u.username, "
+        "EXISTS(SELECT 1 FROM favorites f WHERE f.client_id=c.client_id AND f.driver_id=c.driver_id) mutual, "
         "(SELECT COUNT(*) FROM orders o WHERE o.driver_id=c.driver_id AND o.client_id=c.client_id AND o.status='done') trips "
         "FROM driver_clients c JOIN users u ON u.tg_id=c.client_id WHERE c.driver_id=? ORDER BY u.name",
         (u["tg_id"],),

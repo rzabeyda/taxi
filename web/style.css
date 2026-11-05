@@ -177,3 +177,7 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 .radrow input.on{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.6)}
 
 nav#nav button.lock{opacity:.4}
+
+.dmlist{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto}
+.pill.dim{border-color:#fff;box-shadow:0 0 6px rgba(255,255,255,.7),0 0 14px rgba(255,255,255,.28)}
+.pill.gold.dim{border-color:var(--gold);box-shadow:0 0 6px var(--gold),0 0 14px rgba(255,210,74,.3)}
