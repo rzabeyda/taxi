@@ -101,3 +101,8 @@ _conn.execute(
 _conn.execute(
     "CREATE TABLE IF NOT EXISTS dm(id INTEGER PRIMARY KEY AUTOINCREMENT, from_id INTEGER, to_id INTEGER, text TEXT, created INTEGER, read INTEGER DEFAULT 0)"
 )
+
+try:
+    _conn.execute("ALTER TABLE orders ADD COLUMN geo_done INTEGER DEFAULT 0")
+except sqlite3.OperationalError:
+    pass

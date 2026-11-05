@@ -342,6 +342,7 @@ async def process_order(oid: int):
         )
     except Exception as e:
         log.warning("geo failed: %s", e)
+    db.x("UPDATE orders SET geo_done=1 WHERE id=?", (oid,))
     o = get_order(oid)
     if not o or o["status"] != "open":
         return
@@ -449,6 +450,8 @@ async def state(request: Request, role: str = "client"):
             )
             res = []
             for r in rows:
+                if u["radius_km"] and not r["geo_done"]:
+                    continue  # wait until the address is located, so the order does not flash and vanish
                 dist = driver_distance_km(u, r)
                 if u["radius_km"] and dist is not None and dist > u["radius_km"]:
                     continue
