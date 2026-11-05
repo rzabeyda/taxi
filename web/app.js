@@ -5,6 +5,7 @@ try { tg.setHeaderColor('#000000'); tg.setBackgroundColor('#000000'); tg.disable
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+const carLine = (x) => [x.car, x.color, x.year].filter(Boolean).join(', ');
 const eur = (v) => (Math.round(Number(v || 0) * 100) / 100).toString().replace('.', ',') + ' €';
 const dt = (ts) => new Date(ts * 1000).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -40,6 +41,24 @@ async function act(fn) { try { await fn(); } catch (e) { toast(e.message); } awa
 function ask(text) {
   return new Promise((res) => {
     if (tg.showConfirm) tg.showConfirm(text, res); else res(confirm(text));
+  });
+}
+function readImg(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onerror = rej;
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = rej;
+      img.onload = () => {
+        const k = Math.min(1, 800 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
   });
 }
 function tgLink(u) { return u && u.username ? 'https://t.me/' + u.username : u ? 'tg://user?id=' + u.id : '#'; }
@@ -137,8 +156,9 @@ async function clientOrder() {
     return `<div class="card glow">
       <div class="muted small-t">Водитель принял заказ</div>
       <div class="big" data-eta='${esc(JSON.stringify({ accepted_at: o.accepted_at, eta_min: o.eta_min, arrived_at: o.arrived_at, picked_at: o.picked_at }))}' style="font-size:26px">${etaText(o)}</div>
-      <div class="name" style="margin-top:12px">${esc(d.name)}</div>
-      <div class="muted">${esc(d.car)}${d.username ? ' · @' + esc(d.username) : ''}</div>
+      <div class="row" style="margin-top:12px;justify-content:flex-start;gap:12px">${d.driver_photo ? `<img class="ph round" src="${esc(d.driver_photo)}">` : ''}<div class="name">${esc(d.name)}</div></div>
+      ${d.car_photo ? `<img class="ph" src="${esc(d.car_photo)}">` : ''}
+      <div class="muted">${esc(carLine(d))}${d.username ? ' · @' + esc(d.username) : ''}</div>
       <div class="big" style="font-size:28px;letter-spacing:2px">${esc(d.plate)}</div>
     </div>
     <div class="card">${routeHtml(o)}<div class="row"><b>${eur(o.price)}</b>${kmTag(o)}</div></div>
@@ -148,7 +168,7 @@ async function clientOrder() {
   }
   // done
   return `<div class="card glow center"><div class="muted">Поездка завершена</div><div class="big">${eur(o.price)}</div>
-    <div class="muted">${esc(o.driver.name)} · ${esc(o.driver.car)} ${esc(o.driver.plate)}</div></div>
+    <div class="muted">${esc(o.driver.name)} · ${esc(carLine(o.driver))} ${esc(o.driver.plate)}</div></div>
     <button class="btn gold" data-fav="${o.driver.id}" data-on="${o.fav ? 0 : 1}">${o.fav ? '★ Убрать из избранного' : '☆ Добавить водителя в избранное'}</button>
     <div style="height:10px"></div><button class="btn" data-dismiss="${o.id}">Готово</button>`;
 }
@@ -171,7 +191,7 @@ async function clientHistory() {
   const rows = await api('history?role=client');
   if (!rows.length) return '<div class="card center muted">Поездок пока нет</div>';
   return rows.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>
-    ${routeHtml(o)}<div class="row"><span class="muted small-t">${esc(o.driver.name)} · ${esc(o.driver.car)} ${esc(o.driver.plate)}</span>
+    ${routeHtml(o)}<div class="row"><span class="muted small-t">${esc(o.driver.name)} · ${esc(carLine(o.driver))} ${esc(o.driver.plate)}</span>
     <button class="btn sm gold" style="width:auto" data-fav="${o.driver.id}" data-on="${o.fav ? 0 : 1}">${o.fav ? '★' : '☆'}</button></div></div>`).join('');
 }
 async function clientCabinet() {
@@ -181,7 +201,7 @@ async function clientCabinet() {
     <div class="stats"><div class="stat"><span class="muted small-t">Поездок</span><b>${rows.length}</b></div>
     <div class="stat"><span class="muted small-t">Потрачено</span><b>${eur(spent)}</b></div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Избранные водители</div>
-    ${favs.length ? favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(f.car)} · ${esc(f.plate)}</div></div>
+    ${favs.length ? favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(carLine(f))} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
     <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')
     : '<div class="card center muted">Добавьте водителя в избранное после поездки</div>'}`;
@@ -194,9 +214,14 @@ function driverRegister() {
     <div class="${un ? 'muted' : 'red'} small-t" style="margin:6px 0">${un ? 'Ваш Telegram: @' + esc(un) + ' (клиент сможет вам написать)' : 'У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.'}</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
     <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
     <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
-    <div style="height:10px"></div><label>Марка и цвет авто</label><input id="r_car" placeholder="Toyota Prius, белая">
+    <div style="height:10px"></div><label>Марка и модель</label><input id="r_car" placeholder="Toyota Prius">
+    <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="r_color" placeholder="белый"></div>
+    <div><label>Год</label><input id="r_year" type="number" inputmode="numeric" placeholder="2015"></div></div>
     <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
-    <div style="height:10px"></div><label>Телефон (по желанию)</label><input id="r_phone" type="tel" placeholder="+372 …"></div>
+    <div style="height:10px"></div><label>Телефон (по желанию)</label><input id="r_phone" type="tel" placeholder="+372 …">
+    <div class="grid2" style="margin-top:14px">
+      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="n_car">по желанию</span><input type="file" accept="image/*" id="r_carph" hidden></label>
+      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="n_drv">по желанию</span><input type="file" accept="image/*" id="r_drvph" hidden></label></div></div>
   <button class="btn" id="r_ok">Зарегистрироваться</button>`;
 }
 
@@ -258,7 +283,7 @@ async function driverCabinet() {
     <div class="stat"><span class="muted small-t">Заработано</span><b class="green">${eur(s.earned)}</b></div>
     <div class="stat"><span class="muted small-t">Оборот</span><b>${eur(s.gross)}</b></div>
     <div class="stat"><span class="muted small-t">Отдано сервису</span><b>${eur(s.commission)}</b></div></div>
-    <div class="card"><div class="name">${esc(me.name)}${me.username ? ' <span class="muted">@' + esc(me.username) + '</span>' : ''}</div><div class="muted">${esc(me.car)} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
+    <div class="card"><div class="name">${esc(me.name)}${me.username ? ' <span class="muted">@' + esc(me.username) + '</span>' : ''}</div><div class="muted">${esc(carLine(me))} · ${esc(me.plate)}${me.phone ? ' · ' + esc(me.phone) : ''}</div></div>
     <div class="muted small-t" style="margin:16px 4px 0">Баланс</div>
     ${await driverBalance()}`;
 }
@@ -333,7 +358,13 @@ function bind() {
     });
   }
   const rk = $('#r_ok');
-  if (rk) rk.onclick = () => act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: $('#r_car').value, plate: $('#r_plate').value, phone: $('#r_phone').value }));
+  if (rk) {
+    const ph = {};
+    [['r_carph', 'n_car', 'car_photo'], ['r_drvph', 'n_drv', 'driver_photo']].forEach(([i, n, k]) => {
+      $('#' + i).onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { ph[k] = await readImg(f); $('#' + n).textContent = 'выбрано ✓'; } catch (x) { toast('Не удалось прочитать фото'); } };
+    });
+    rk.onclick = () => act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: $('#r_car').value, color: $('#r_color').value, year: $('#r_year').value, plate: $('#r_plate').value, phone: $('#r_phone').value, car_photo: ph.car_photo, driver_photo: ph.driver_photo }));
+  }
   const pk = $('#pay_ok');
   if (pk) pk.onclick = () => act(async () => { await api('driver/pay', {}); toast('Заявка отправлена'); });
 }

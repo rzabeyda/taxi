@@ -68,7 +68,8 @@ def x(sql, args=()):
         return c.rowcount, c.lastrowid
 
 
-try:
-    _conn.execute("ALTER TABLE users ADD COLUMN real_name TEXT")
-except sqlite3.OperationalError:
-    pass
+for _col in ("real_name TEXT", "color TEXT", "year INTEGER", "car_photo TEXT", "driver_photo TEXT"):
+    try:
+        _conn.execute("ALTER TABLE users ADD COLUMN " + _col)
+    except sqlite3.OperationalError:
+        pass

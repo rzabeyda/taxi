@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -40,6 +41,8 @@ PAY_INFO = os.getenv("PAY_INFO", "Реквизиты для оплаты уто�
 FAV_WAIT = int(os.getenv("FAV_WAIT", "60"))
 ARRIVE_M = 150  # radius for "arrived" detection, metres
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
@@ -79,6 +82,26 @@ def get_order(oid):
 
 def get_user(uid):
     return db.q1("SELECT * FROM users WHERE tg_id=?", (uid,))
+
+
+def save_photo(data_url, kind: str, uid: int):
+    """Save a jpeg data URL, return public path or None."""
+    if not data_url or not isinstance(data_url, str) or "," not in data_url:
+        return None
+    try:
+        raw = base64.b64decode(data_url.split(",", 1)[1])
+    except Exception:
+        return None
+    if len(raw) > 2_000_000 or not raw.startswith(b"\xff\xd8"):
+        raise HTTPException(400, "Фото должно быть JPEG до 2 МБ")
+    fn = f"{kind}_{uid}_{now()}.jpg"
+    with open(os.path.join(UPLOAD_DIR, fn), "wb") as f:
+        f.write(raw)
+    return "/uploads/" + fn
+
+
+def car_line(u: dict) -> str:
+    return ", ".join(str(x) for x in (u.get("car"), u.get("color"), u.get("year")) if x)
 
 
 def auth(request: Request) -> dict:
@@ -138,7 +161,8 @@ def order_view(o: dict, viewer: int, with_nav=False) -> dict:
         dr = get_user(o["driver_id"])
         d["driver"] = {
             "id": dr["tg_id"], "name": dr["name"], "car": dr["car"], "plate": dr["plate"],
-            "phone": dr["phone"], "username": dr["username"],
+            "phone": dr["phone"], "username": dr["username"], "color": dr["color"],
+            "year": dr["year"], "car_photo": dr["car_photo"], "driver_photo": dr["driver_photo"],
         }
     cl = get_user(o["client_id"])
     d["client"] = {"id": cl["tg_id"], "name": cl["name"], "username": cl["username"]}
@@ -327,7 +351,7 @@ async def state(request: Request, role: str = "client"):
     out = {
         "me": {
             "id": uid, "name": u["name"], "username": u["username"], "is_driver": bool(u["is_driver"]),
-            "online": bool(u["online"]), "car": u["car"], "plate": u["plate"], "phone": u["phone"],
+            "online": bool(u["online"]), "car": u["car"], "color": u["color"], "year": u["year"], "plate": u["plate"], "phone": u["phone"],
             "debt": d, "limit": DEBT_LIMIT, "blocked": d >= DEBT_LIMIT,
         },
         "now": now(),
@@ -375,14 +399,29 @@ async def driver_register(request: Request):
     if len(name.split()) < 2:
         raise HTTPException(400, "Укажите имя и фамилию")
     car = str(b.get("car", "")).strip()[:40]
+    color = str(b.get("color", "")).strip()[:20]
+    try:
+        year = int(b.get("year"))
+    except Exception:
+        year = 0
+    if not color:
+        raise HTTPException(400, "Укажите цвет авто")
+    if not (1980 <= year <= time.gmtime().tm_year + 1):
+        raise HTTPException(400, "Укажите год авто")
     plate = str(b.get("plate", "")).strip().upper()[:12]
     phone = str(b.get("phone", "")).strip()[:20]
     if len(car) < 2 or len(plate) < 3:
         raise HTTPException(400, "Укажите марку авто и номер")
     db.x(
-        "UPDATE users SET is_driver=1, name=?, real_name=?, car=?, plate=?, phone=? WHERE tg_id=?",
-        (name, name, car, plate, phone, u["tg_id"]),
+        "UPDATE users SET is_driver=1, name=?, real_name=?, car=?, color=?, year=?, plate=?, phone=? WHERE tg_id=?",
+        (name, name, car, color, year, plate, phone, u["tg_id"]),
     )
+    cp = save_photo(b.get("car_photo"), "car", u["tg_id"])
+    dph = save_photo(b.get("driver_photo"), "drv", u["tg_id"])
+    if cp:
+        db.x("UPDATE users SET car_photo=? WHERE tg_id=?", (cp, u["tg_id"]))
+    if dph:
+        db.x("UPDATE users SET driver_photo=? WHERE tg_id=?", (dph, u["tg_id"]))
     return {"ok": True}
 
 
@@ -460,7 +499,7 @@ async def order_accept(oid: int, request: Request):
     o = get_order(oid)
     asyncio.create_task(clear_notifs(oid, "✅ Заказ принят другим водителем"))
     msg = (
-        f"✅ Водитель найден\n👤 {u['name']}\n🚗 {u['car']} · {u['plate']}\n"
+        f"✅ Водитель найден\n👤 {u['name']}\n🚗 {car_line(u)} · {u['plate']}\n"
         f"⏱ Будет через {eta} мин"
     )
     asyncio.create_task(notify(o["client_id"], msg, oid))
@@ -590,7 +629,7 @@ async def history(request: Request, role: str = "client"):
 async def favorites(request: Request):
     u = auth(request)
     rows = db.q(
-        "SELECT u.tg_id id, u.name, u.car, u.plate, u.online FROM favorites f "
+        "SELECT u.tg_id id, u.name, u.car, u.color, u.year, u.plate, u.online FROM favorites f "
         "JOIN users u ON u.tg_id=f.driver_id WHERE f.client_id=?",
         (u["tg_id"],),
     )
@@ -763,4 +802,5 @@ async def index():
     )
 
 
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
