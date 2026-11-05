@@ -217,7 +217,7 @@ async function clientCabinet() {
 function driverRegister() {
   const un = S.st.me.username;
   return `<div class="card"><div class="name">Стать водителем</div>
-    <div class="${un ? 'muted' : 'red'} small-t" style="margin:6px 0">${un ? 'Ваш Telegram: @' + esc(un) + ' (клиент сможет вам написать)' : 'У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.'}</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
+    ${un ? '' : '<div class="red small-t" style="margin:6px 0">У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.</div>'}<div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
     <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
     <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
     <div style="height:10px"></div><label>Марка</label><input id="r_make" placeholder="Toyota">
