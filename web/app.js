@@ -153,7 +153,7 @@ async function clientOrder() {
       <div class="big">${eur(o.price)}</div>
       <div class="muted small-t">Повысьте цену, чтобы заказ приняли быстрее</div>
     </div>
-    <div class="grid2"><button class="btn" data-raise="1">+1 €</button><button class="btn" data-raise="2">+2 €</button></div>
+    <div class="grid2"><button class="btn" data-raise="-0.5" ${o.price <= 1 ? 'disabled' : ''}>− 0,5 €</button><button class="btn" data-raise="0.5">+ 0,5 €</button></div>
     <div style="height:10px"></div>
     <button class="btn danger" data-cancel="${o.id}">Отменить заказ</button>`;
   }
@@ -358,8 +358,8 @@ function bind() {
   const ok = $('#f_ok');
   if (ok) {
     const price = $('#f_price');
-    $('#p_minus').onclick = () => (price.value = Math.max(1, (+price.value || 5) - 1));
-    $('#p_plus').onclick = () => (price.value = (+price.value || 5) + 1);
+    $('#p_minus').onclick = () => (price.value = Math.max(1, (+price.value || 5) - 0.5));
+    $('#p_plus').onclick = () => (price.value = (+price.value || 5) + 0.5);
     ok.onclick = () => act(async () => {
       const body = { from: $('#f_from').value, to: $('#f_to').value, price: +price.value, target_driver_id: $('#f_target') ? $('#f_target').value || null : null };
       await api('order', body);

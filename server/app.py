@@ -533,17 +533,20 @@ async def order_raise(oid: int, request: Request):
     u = auth(request)
     b = await request.json()
     try:
-        delta = float(b.get("delta", 1))
+        delta = float(b.get("delta", 0.5))
     except Exception:
-        delta = 1
-    delta = max(0.5, min(delta, 20))
+        delta = 0.5
+    delta = max(-20, min(delta, 20))
     o = get_order(oid)
-    if not o or o["client_id"] != u["tg_id"] or o["status"] != "open":
+    if not o or o["client_id"] != u["tg_id"] or o["status"] != "open" or delta == 0:
         raise HTTPException(400, "Нельзя изменить цену")
-    new = round(min(200, o["price"] + delta), 2)
+    new = round(max(1, min(200, o["price"] + delta)), 2)
+    if new == o["price"]:
+        return {"price": new}
     db.x("UPDATE orders SET price=? WHERE id=? AND status='open'", (new, oid))
 
-    async def re():
+    async def up():
+        # price went up: fresh push to drivers
         await clear_notifs(oid)
         o2 = get_order(oid)
         if o2 and o2["target_driver_id"]:
@@ -551,7 +554,19 @@ async def order_raise(oid: int, request: Request):
         else:
             await broadcast(oid, prefix="💶 Цена выросла")
 
-    asyncio.create_task(re())
+    async def down():
+        # price went down: quietly edit existing notifications
+        o2 = get_order(oid)
+        for r in db.q("SELECT chat_id, message_id FROM notifs WHERE order_id=?", (oid,)):
+            try:
+                await bot.edit_message_text(
+                    notif_text(o2, "🚕 Новый заказ"), chat_id=r["chat_id"],
+                    message_id=r["message_id"], reply_markup=open_kb(oid),
+                )
+            except Exception:
+                pass
+
+    asyncio.create_task(up() if delta > 0 else down())
     return {"price": new}
 
 
