@@ -552,21 +552,42 @@ function bind() {
 }
 
 /* ---------------------------------------------------------------- geolocation (driver) */
-let geoWatch = null, lastSent = 0;
+let geoWatch = null, geoTimer = null, geoStarting = false, lmDenied = false, lastSent = 0;
+const LM = tg.LocationManager;
+const useLM = !!(LM && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'));
 function geoGap() {
   const o = S.st && S.st.driver_order;
   return o && o.status === 'accepted' ? 8000 : 30000;
+}
+function sendLoc(lat, lng) { lastSent = Date.now(); api('location', { lat, lng }).catch(() => {}); }
+function lmTick() {
+  if (Date.now() - lastSent < geoGap()) return;
+  LM.getLocation((loc) => {
+    if (loc && loc.latitude != null) sendLoc(loc.latitude, loc.longitude);
+    else if (LM.isInited && LM.isAccessRequested && !LM.isAccessGranted && !lmDenied) { lmDenied = true; toast('Разрешите геолокацию для бота в настройках Telegram'); }
+  });
 }
 function syncGeo() {
   const st = S.st; if (!st) return;
   const o = st.driver_order;
   const need = (o && o.status === 'accepted') || (st.me.is_driver && st.me.online);
+  if (useLM) {
+    // Telegram's own location manager: permission is asked once per bot and remembered
+    if (need && !geoTimer && !geoStarting && !lmDenied) {
+      geoStarting = true;
+      LM.init(() => {
+        geoStarting = false;
+        if (LM.isAccessRequested && !LM.isAccessGranted) { lmDenied = true; toast('Разрешите геолокацию для бота в настройках Telegram'); return; }
+        lmTick();
+        geoTimer = setInterval(() => { if (lmDenied) { clearInterval(geoTimer); geoTimer = null; return; } lmTick(); }, 8000);
+      });
+    } else if (!need && geoTimer) { clearInterval(geoTimer); geoTimer = null; }
+    return;
+  }
   if (need && geoWatch === null && navigator.geolocation) {
     geoWatch = navigator.geolocation.watchPosition((p) => {
-      const t = Date.now();
-      if (t - lastSent < geoGap()) return;
-      lastSent = t;
-      api('location', { lat: p.coords.latitude, lng: p.coords.longitude }).catch(() => {});
+      if (Date.now() - lastSent < geoGap()) return;
+      sendLoc(p.coords.latitude, p.coords.longitude);
     }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
   } else if (!need && geoWatch !== null) {
     navigator.geolocation.clearWatch(geoWatch); geoWatch = null;
