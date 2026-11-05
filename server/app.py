@@ -97,7 +97,7 @@ def auth(request: Request) -> dict:
     name = (u.get("first_name", "") + " " + u.get("last_name", "")).strip() or "Без имени"
     db.x(
         "INSERT INTO users(tg_id,name,username,created) VALUES(?,?,?,?) "
-        "ON CONFLICT(tg_id) DO UPDATE SET name=excluded.name, username=excluded.username",
+        "ON CONFLICT(tg_id) DO UPDATE SET name=CASE WHEN real_name IS NOT NULL THEN name ELSE excluded.name END, username=excluded.username",
         (u["id"], name, u.get("username"), now()),
     )
     return get_user(u["id"])
@@ -368,14 +368,17 @@ async def order_get(oid: int, request: Request):
 async def driver_register(request: Request):
     u = auth(request)
     b = await request.json()
+    name = " ".join(str(b.get("name", "")).split())[:50]
+    if len(name.split()) < 2:
+        raise HTTPException(400, "Укажите имя и фамилию")
     car = str(b.get("car", "")).strip()[:40]
     plate = str(b.get("plate", "")).strip().upper()[:12]
     phone = str(b.get("phone", "")).strip()[:20]
     if len(car) < 2 or len(plate) < 3:
         raise HTTPException(400, "Укажите марку авто и номер")
     db.x(
-        "UPDATE users SET is_driver=1, car=?, plate=?, phone=? WHERE tg_id=?",
-        (car, plate, phone, u["tg_id"]),
+        "UPDATE users SET is_driver=1, name=?, real_name=?, car=?, plate=?, phone=? WHERE tg_id=?",
+        (name, name, car, plate, phone, u["tg_id"]),
     )
     return {"ok": True}
 

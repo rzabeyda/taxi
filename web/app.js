@@ -16,8 +16,8 @@ const IC = {
   wallet: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
 };
 const TABS = {
-  client: [['Заказ', IC.car], ['Поездки', IC.list], ['Избранные', IC.star]],
-  driver: [['Заказы', IC.car], ['Кабинет', IC.user], ['Баланс', IC.wallet]],
+  client: [['Заказ', IC.car], ['Поездки', IC.list], ['Кабинет', IC.user]],
+  driver: [['Заказы', IC.car], ['Баланс', IC.wallet], ['Кабинет', IC.user]],
 };
 
 let S = { role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
@@ -93,9 +93,9 @@ async function render(force) {
   const v = $('#view');
   try {
     let html;
-    if (S.role === 'client') html = await [clientOrder, clientHistory, clientFavs][S.tab]();
-    else if (!S.st.me.is_driver) html = driverRegister();
-    else html = await [driverOrders, driverCabinet, driverBalance][S.tab]();
+    if (S.role === 'client') html = await [clientOrder, clientHistory, clientCabinet][S.tab]();
+    else if (!S.st.me.is_driver) html = S.tab === 0 ? driverRegister() : '<div class="card center muted">Сначала зарегистрируйтесь на вкладке «Заказы»</div>';
+    else html = await [driverOrders, driverBalance, driverCabinet][S.tab]();
     if (key !== S.key) return; // superseded
     v.innerHTML = html;
     bind();
@@ -174,18 +174,24 @@ async function clientHistory() {
     ${routeHtml(o)}<div class="row"><span class="muted small-t">${esc(o.driver.name)} · ${esc(o.driver.car)} ${esc(o.driver.plate)}</span>
     <button class="btn sm gold" style="width:auto" data-fav="${o.driver.id}" data-on="${o.fav ? 0 : 1}">${o.fav ? '★' : '☆'}</button></div></div>`).join('');
 }
-async function clientFavs() {
-  const rows = await api('favorites');
-  if (!rows.length) return '<div class="card center muted">Здесь будут ваши водители.<br>Добавьте водителя в избранное после поездки.</div>';
-  return rows.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(f.car)} · ${esc(f.plate)}</div></div>
+async function clientCabinet() {
+  const [rows, favs] = await Promise.all([api('history?role=client'), api('favorites')]);
+  const spent = rows.reduce((a, o) => a + o.price, 0);
+  return `<div class="card"><div class="name">${esc(S.st.me.name)}</div></div>
+    <div class="stats"><div class="stat"><span class="muted small-t">Поездок</span><b>${rows.length}</b></div>
+    <div class="stat"><span class="muted small-t">Потрачено</span><b>${eur(spent)}</b></div></div>
+    <div class="muted small-t" style="margin:16px 4px 0">Избранные водители</div>
+    ${favs.length ? favs.map((f) => `<div class="card"><div class="row"><div><div class="name">${esc(f.name)}</div><div class="muted small-t">${esc(f.car)} · ${esc(f.plate)}</div></div>
     <div class="col" style="align-items:flex-end"><span class="tag ${f.online ? 'green' : ''}">${f.online ? 'на линии' : 'не на линии'}</span>
-    <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('');
+    <button class="btn sm danger" style="width:auto" data-fav="${f.id}" data-on="0">Убрать</button></div></div></div>`).join('')
+    : '<div class="card center muted">Добавьте водителя в избранное после поездки</div>'}`;
 }
 
 /* ---------------------------------------------------------------- driver */
 function driverRegister() {
   return `<div class="card"><div class="name">Стать водителем</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
-    <label>Марка и цвет авто</label><input id="r_car" placeholder="Toyota Prius, белая">
+    <label>Имя и фамилия</label><input id="r_name" placeholder="Иван Иванов" autocomplete="name">
+    <div style="height:10px"></div><label>Марка и цвет авто</label><input id="r_car" placeholder="Toyota Prius, белая">
     <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
     <div style="height:10px"></div><label>Телефон (по желанию)</label><input id="r_phone" type="tel" placeholder="+372 …"></div>
   <button class="btn" id="r_ok">Зарегистрироваться</button>`;
@@ -321,7 +327,7 @@ function bind() {
     });
   }
   const rk = $('#r_ok');
-  if (rk) rk.onclick = () => act(() => api('driver/register', { car: $('#r_car').value, plate: $('#r_plate').value, phone: $('#r_phone').value }));
+  if (rk) rk.onclick = () => act(() => api('driver/register', { name: $('#r_name').value, car: $('#r_car').value, plate: $('#r_plate').value, phone: $('#r_phone').value }));
   const pk = $('#pay_ok');
   if (pk) pk.onclick = () => act(async () => { await api('driver/pay', {}); toast('Заявка отправлена'); });
 }

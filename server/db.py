@@ -66,3 +66,9 @@ def x(sql, args=()):
     with _lock:
         c = _conn.execute(sql, args)
         return c.rowcount, c.lastrowid
+
+
+try:
+    _conn.execute("ALTER TABLE users ADD COLUMN real_name TEXT")
+except sqlite3.OperationalError:
+    pass
