@@ -502,10 +502,6 @@ async def driver_online(request: Request):
     if on and debt(u["tg_id"]) >= DEBT_LIMIT:
         raise HTTPException(403, f"Долг {DEBT_LIMIT:g} € — сначала оплатите комиссию")
     db.x("UPDATE users SET online=? WHERE tg_id=?", (int(on), u["tg_id"]))
-    if on != bool(u["online"]):
-        txt = f"🟢 {u['name']} онлайн" if on else f"⚪ {u['name']} офлайн"
-        for a in ADMIN_IDS:
-            asyncio.create_task(notify(a, txt))
     return {"ok": True}
 
 
