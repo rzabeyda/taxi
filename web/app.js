@@ -274,9 +274,9 @@ async function driverOrders() {
   sorted.forEach((x) => S.seen.add(x.id));
   if (fresh.length && tg.HapticFeedback) { try { tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} }
   return h + sorted.map((x) => `<div class="orow ${x.personal ? 'personal' : ''} ${fresh.includes(x) ? 'new' : ''}" data-open="${x.id}">
-    <div class="op"><b>${eur(x.price)}</b>${x.km ? `<span>${x.km} км</span>` : ''}</div>
+    <div class="op"><b>${eur(x.price)}</b><button class="hide" data-hide="${x.id}">✕</button></div>
     <div class="oroute">${x.personal ? '<div class="plabel">Лично вам</div>' : ''}${x.away != null ? `<div class="plabel" style="color:var(--muted);font-weight:600">${x.away} км от вас</div>` : ''}${x.my_offer ? `<div class="plabel" style="color:var(--gold)">Ваше: ${eur(x.my_offer.price)}</div>` : ''}${routeHtml(x)}</div>
-    <div class="oside"><button class="hide" data-hide="${x.id}">✕</button><div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div></div>`).join('');
+    <div class="oside"><span class="km">${x.km ? x.km + ' км' : ''}</span><div class="ot">${new Date(x.created * 1000).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div></div></div>`).join('');
 }
 function driverActive(o) {
   const c = o.client;

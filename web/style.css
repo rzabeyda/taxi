@@ -165,3 +165,8 @@ label.btn.ghost{cursor:pointer;color:#fff;border-color:#444}
 .orow.new{animation:blink .9s ease-in-out 6}
 .oside{display:flex;flex-direction:column;align-items:flex-end;gap:6px;align-self:flex-start}
 .hide{background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;width:30px;height:30px;font-size:14px;padding:0}
+
+.orow .op{gap:6px}
+.orow .oside{align-self:stretch;justify-content:space-between;align-items:flex-end;min-height:56px}
+.orow .km{font-size:15px;font-weight:700;color:#fff;white-space:nowrap}
+.orow .ot{align-self:auto}
