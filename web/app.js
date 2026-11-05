@@ -220,7 +220,8 @@ function driverRegister() {
     <div class="${un ? 'muted' : 'red'} small-t" style="margin:6px 0">${un ? 'Ваш Telegram: @' + esc(un) + ' (клиент сможет вам написать)' : 'У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.'}</div><div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
     <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
     <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
-    <div style="height:10px"></div><label>Марка и модель</label><input id="r_car" placeholder="Toyota Prius">
+    <div style="height:10px"></div><label>Марка</label><input id="r_make" placeholder="Toyota">
+    <div style="height:10px"></div><label>Модель</label><input id="r_model" placeholder="Prius">
     <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="r_color" placeholder="белый"></div>
     <div><label>Год</label><input id="r_year" type="number" inputmode="numeric" placeholder="2015"></div></div>
     <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
@@ -372,7 +373,7 @@ function bind() {
     [['r_carph', 'n_car', 'car_photo'], ['r_drvph', 'n_drv', 'driver_photo']].forEach(([i, n, k]) => {
       $('#' + i).onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { ph[k] = await readImg(f); $('#' + n).textContent = 'выбрано ✓'; } catch (x) { toast('Не удалось прочитать фото'); } };
     });
-    rk.onclick = () => act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: $('#r_car').value, color: $('#r_color').value, year: $('#r_year').value, plate: $('#r_plate').value, phone: $('#r_phone').value, car_photo: ph.car_photo, driver_photo: ph.driver_photo }));
+    rk.onclick = () => (!$('#r_make').value.trim() || !$('#r_model').value.trim()) ? toast('Укажите марку и модель') : act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: ($('#r_make').value.trim() + ' ' + $('#r_model').value.trim()).trim(), color: $('#r_color').value, year: $('#r_year').value, plate: $('#r_plate').value, phone: $('#r_phone').value, car_photo: ph.car_photo, driver_photo: ph.driver_photo }));
   }
   const pk = $('#pay_ok');
   if (pk) pk.onclick = () => act(async () => { await api('driver/pay', {}); toast('Заявка отправлена'); });
