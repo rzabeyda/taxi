@@ -70,6 +70,16 @@ function readImg(file) {
 }
 function tgLink(u) { return u && u.username ? 'https://t.me/' + u.username : u ? 'tg://user?id=' + u.id : '#'; }
 
+
+/* external links: open via Telegram so Waze / Google Maps apps can take over */
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  const h = a.getAttribute('href') || '';
+  if (/^https?:\/\/(t\.me|telegram\.me)\//.test(h) && tg.openTelegramLink) { e.preventDefault(); tg.openTelegramLink(h); return; }
+  if (/^https?:\/\//.test(h) && tg.openLink) { e.preventDefault(); try { tg.openLink(h); } catch (x) { window.open(h, '_blank'); } }
+});
+
 /* ---------------------------------------------------------------- chrome */
 function drawChrome() {
   document.querySelectorAll('#roleSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.role === S.role));
