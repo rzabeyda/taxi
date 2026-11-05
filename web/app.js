@@ -268,7 +268,8 @@ async function driverOrders() {
     if (!ls('dd' + o.id)) {
       return `<div class="card glow center"><div class="muted">Поездка завершена</div><div class="big">${eur(o.price)}</div>
         <div class="muted">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>
-        <button class="btn" data-ddismiss="${o.id}">Готово</button>`;
+        <button class="btn gold" data-cfav="${o.client.id}" data-on="${o.cfav ? 0 : 1}">${o.cfav ? '★ Клиент в списке' : '☆ Добавить клиента'}</button>
+        <div style="height:10px"></div><button class="btn" data-ddismiss="${o.id}">Готово</button>`;
     }
   }
   if (o && o.status === 'accepted') return driverActive(o);
@@ -323,11 +324,33 @@ async function openTrips() {
   const m = $('#modal');
   m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><div class="name" style="margin-bottom:6px">Поездки</div>
     ${hist.length ? hist.map((o) => `<div class="card"><div class="row"><span class="muted small-t">${dt(o.done_at)}</span><b>${eur(o.price)}</b></div>${routeHtml(o)}
-      <div class="muted small-t">Комиссия ${eur(o.commission)} · вам ${eur(o.net)}</div></div>`).join('') : '<div class="card center muted">Поездок пока нет</div>'}
+      <div class="row"><span class="muted small-t">${esc(o.client.name)} · комиссия ${eur(o.commission)} · вам ${eur(o.net)}</span>
+      <button class="btn sm gold" style="width:auto;padding:6px 12px" data-cfav="${o.client.id}" data-on="${o.cfav ? 0 : 1}">${o.cfav ? '★' : '☆'}</button></div></div>`).join('') : '<div class="card center muted">Поездок пока нет</div>'}
+    <button class="btn ghost" id="cl">Закрыть</button></div>`;
+  m.querySelectorAll('[data-cfav]').forEach((el) => (el.onclick = async () => {
+    try { await api('driver/clients', { client_id: +el.dataset.cfav, on: el.dataset.on === '1' }); } catch (e) { toast(e.message); }
+    openTrips();
+  }));
+  m.classList.remove('hidden');
+  m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
+  $('#cl').onclick = () => m.classList.add('hidden');
+}
+
+async function openClients() {
+  const rows = await api('driver/clients');
+  const m = $('#modal');
+  m.innerHTML = `<div class="sheet" style="max-height:92vh;overflow:auto"><div class="name" style="margin-bottom:6px">Клиенты</div>
+    ${rows.length ? rows.map((c) => `<div class="card"><div class="row"><div><div class="name">${esc(c.name)}</div><div class="muted small-t">${c.username ? '@' + esc(c.username) + ' · ' : ''}поездок: ${c.trips}</div></div>
+      <div class="col" style="align-items:flex-end"><a class="btn sm" style="width:auto" href="${tgLink(c)}" target="_blank">Написать</a>
+      <button class="btn sm danger" style="width:auto" data-crm="${c.id}">Убрать</button></div></div></div>`).join('') : '<div class="card center muted">Добавьте клиента после поездки, и он появится здесь</div>'}
     <button class="btn ghost" id="cl">Закрыть</button></div>`;
   m.classList.remove('hidden');
   m.onclick = (e) => { if (e.target === m) m.classList.add('hidden'); };
   $('#cl').onclick = () => m.classList.add('hidden');
+  m.querySelectorAll('[data-crm]').forEach((el) => (el.onclick = async () => {
+    try { await api('driver/clients', { client_id: +el.dataset.crm, on: false }); } catch (e) { toast(e.message); }
+    openClients();
+  }));
 }
 
 let chatLast = 0;
@@ -372,6 +395,7 @@ async function driverCabinet() {
       <div class="pill dim"><span>Расстояние</span><b>${s.km} км</b></div>
       <div class="pill dim"><span>Дни</span><b>${s.work_days}</b></div>
       <div class="pill ${me.allow_rating ? 'green' : 'red'}" id="rsw"><span>Оценки</span><b>${me.allow_rating ? 'Вкл' : 'Выкл'}</b></div>
+      <div class="pill" data-clients="1" style="grid-column:1/-1"><span>Клиенты</span><b>${s.clients}</b></div>
     </div>`;
 }
 
@@ -508,6 +532,8 @@ function bind() {
   on('[data-fav]', (el) => act(() => api('favorites', { driver_id: +el.dataset.fav, on: el.dataset.on === '1' })));
   on('[data-open]', (el) => openOrder(+el.dataset.open));
   on('[data-edit]', () => openEdit());
+  on('[data-clients]', () => openClients());
+  on('[data-cfav]', (el) => act(() => api('driver/clients', { client_id: +el.dataset.cfav, on: el.dataset.on === '1' })));
   on('[data-rad]', (el) => act(() => api('driver/radius', { km: el.dataset.rad ? +el.dataset.rad : null })));
   const rc = $('#rad_c'); if (rc) rc.onchange = () => act(() => api('driver/radius', { km: rc.value ? +rc.value : null }));
   on('[data-oacc]', (el) => act(() => api('offer/' + el.dataset.oacc + '/accept', {})));

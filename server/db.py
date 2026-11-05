@@ -93,3 +93,7 @@ try:
     _conn.execute("ALTER TABLE users ADD COLUMN radius_km REAL")
 except sqlite3.OperationalError:
     pass
+
+_conn.execute(
+    "CREATE TABLE IF NOT EXISTS driver_clients(driver_id INTEGER, client_id INTEGER, PRIMARY KEY(driver_id, client_id))"
+)

@@ -226,6 +226,13 @@ def order_view(o: dict, viewer: int, with_nav=False) -> dict:
                 (o["client_id"], o["driver_id"]),
             )
         )
+        if o["driver_id"] == viewer:
+            d["cfav"] = bool(
+                db.q1(
+                    "SELECT 1 x FROM driver_clients WHERE driver_id=? AND client_id=?",
+                    (viewer, o["client_id"]),
+                )
+            )
     if with_nav:
         d["nav"] = nav_links(o)
     return d
@@ -765,6 +772,7 @@ async def driver_stats(request: Request):
         (uid,),
     )
     return {
+        "clients": db.q1("SELECT COUNT(*) n FROM driver_clients WHERE driver_id=?", (uid,))["n"],
         "km": round(extra["km"], 1), "work_days": extra["days"], "since_days": since,
         "count": s["n"], "gross": round(s["gross"], 2), "commission": round(s["com"], 2),
         "earned": round(s["gross"] - s["com"], 2), "paid": round(paid, 2),
@@ -834,6 +842,37 @@ async def order_rate(oid: int, request: Request):
     if not n:
         raise HTTPException(400, "Уже оценено")
     asyncio.create_task(notify(o["driver_id"], f"⭐ Клиент поставил оценку: {r} из 5"))
+    return {"ok": True}
+
+
+@app.get("/api/driver/clients")
+async def driver_clients_get(request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Только для водителей")
+    return db.q(
+        "SELECT c.client_id id, u.name, u.username, "
+        "(SELECT COUNT(*) FROM orders o WHERE o.driver_id=c.driver_id AND o.client_id=c.client_id AND o.status='done') trips "
+        "FROM driver_clients c JOIN users u ON u.tg_id=c.client_id WHERE c.driver_id=? ORDER BY u.name",
+        (u["tg_id"],),
+    )
+
+
+@app.post("/api/driver/clients")
+async def driver_clients_set(request: Request):
+    u = auth(request)
+    if not u["is_driver"]:
+        raise HTTPException(403, "Только для водителей")
+    b = await request.json()
+    cid = int(b.get("client_id"))
+    if b.get("on"):
+        if not db.q1(
+            "SELECT 1 x FROM orders WHERE driver_id=? AND client_id=? AND status='done'", (u["tg_id"], cid)
+        ):
+            raise HTTPException(400, "Можно добавить только клиента после поездки")
+        db.x("INSERT OR IGNORE INTO driver_clients(driver_id,client_id) VALUES(?,?)", (u["tg_id"], cid))
+    else:
+        db.x("DELETE FROM driver_clients WHERE driver_id=? AND client_id=?", (u["tg_id"], cid))
     return {"ok": True}
 
 
