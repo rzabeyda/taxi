@@ -27,7 +27,7 @@ const TABS = {
   driver: [['Заказы', IC.car], ['Поездки', IC.list], ['Профиль', IC.user]],
 };
 
-let S = { role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
+let S = { ph: {}, role: ls('role') || 'client', tab: 0, st: null, key: '', off: 0, eta: 10 };
 
 async function api(path, body) {
   const r = await fetch('/api/' + path, {
@@ -41,7 +41,7 @@ async function api(path, body) {
 }
 function toast(m) {
   const t = $('#toast'); t.textContent = m; t.classList.remove('hidden');
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 2600);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 4000);
 }
 async function act(fn) { try { await fn(); } catch (e) { toast(e.message); } await refresh(true); }
 function ask(text) {
@@ -214,21 +214,28 @@ async function clientCabinet() {
 }
 
 /* ---------------------------------------------------------------- driver */
+let REGDRAFT = {};
+try { REGDRAFT = JSON.parse(ls('regdraft') || '{}'); } catch (e) {}
+const dv = (id) => esc(REGDRAFT[id] || '');
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.id && t.id.startsWith('r_') && t.type !== 'file') { REGDRAFT[t.id] = t.value; ls('regdraft', JSON.stringify(REGDRAFT)); }
+});
 function driverRegister() {
   const un = S.st.me.username;
   return `<div class="card"><div class="name">Стать водителем</div>
     ${un ? '' : '<div class="red small-t" style="margin:6px 0">У вас нет @username. Задайте его в настройках Telegram и откройте приложение заново.</div>'}<div class="muted small-t" style="margin:6px 0 12px">Данные увидит клиент после принятия заказа.</div>
-    <label>Имя</label><input id="r_first" placeholder="Иван" autocomplete="given-name">
-    <div style="height:10px"></div><label>Фамилия</label><input id="r_last" placeholder="Иванов" autocomplete="family-name">
-    <div style="height:10px"></div><label>Марка</label><input id="r_make" placeholder="Toyota">
-    <div style="height:10px"></div><label>Модель</label><input id="r_model" placeholder="Prius">
-    <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="r_color" placeholder="белый"></div>
-    <div><label>Год</label><input id="r_year" type="number" inputmode="numeric" placeholder="2015"></div></div>
-    <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" placeholder="123 ABC" style="text-transform:uppercase">
-    <div style="height:10px"></div><label>Телефон</label><input id="r_phone" type="tel" placeholder="+372 …">
+    <label>Имя</label><input id="r_first" value="${dv('r_first')}" placeholder="Иван" autocomplete="given-name">
+    <div style="height:10px"></div><label>Фамилия</label><input id="r_last" value="${dv('r_last')}" placeholder="Иванов" autocomplete="family-name">
+    <div style="height:10px"></div><label>Марка</label><input id="r_make" value="${dv('r_make')}" placeholder="Toyota">
+    <div style="height:10px"></div><label>Модель</label><input id="r_model" value="${dv('r_model')}" placeholder="Prius">
+    <div class="grid2" style="margin-top:10px"><div><label>Цвет</label><input id="r_color" value="${dv('r_color')}" placeholder="белый"></div>
+    <div><label>Год</label><input id="r_year" value="${dv('r_year')}" type="number" inputmode="numeric" placeholder="2015"></div></div>
+    <div style="height:10px"></div><label>Номер авто</label><input id="r_plate" value="${dv('r_plate')}" placeholder="123 ABC" style="text-transform:uppercase">
+    <div style="height:10px"></div><label>Телефон</label><input id="r_phone" value="${dv('r_phone')}" type="tel" placeholder="+372 …">
     <div class="grid2" style="margin-top:14px">
-      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="n_car"></span><input type="file" accept="image/*" id="r_carph" hidden></label>
-      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="n_drv"></span><input type="file" accept="image/*" id="r_drvph" hidden></label></div></div>
+      <label class="btn sm ghost" style="margin:0">Фото машины<br><span class="small-t" id="n_car">${S.ph.car_photo ? 'выбрано ✓' : ''}</span><input type="file" accept="image/*" id="r_carph" hidden></label>
+      <label class="btn sm ghost" style="margin:0">Ваше фото<br><span class="small-t" id="n_drv">${S.ph.driver_photo ? 'выбрано ✓' : ''}</span><input type="file" accept="image/*" id="r_drvph" hidden></label></div></div>
   <button class="btn" id="r_ok">Зарегистрироваться</button>`;
 }
 
@@ -369,11 +376,24 @@ function bind() {
   }
   const rk = $('#r_ok');
   if (rk) {
-    const ph = {};
+    const ph = S.ph;
     [['r_carph', 'n_car', 'car_photo'], ['r_drvph', 'n_drv', 'driver_photo']].forEach(([i, n, k]) => {
       $('#' + i).onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { ph[k] = await readImg(f); $('#' + n).textContent = 'выбрано ✓'; } catch (x) { toast('Не удалось прочитать фото'); } };
     });
-    rk.onclick = () => (!$('#r_make').value.trim() || !$('#r_model').value.trim()) ? toast('Укажите марку и модель') : act(() => api('driver/register', { name: $('#r_first').value.trim() + ' ' + $('#r_last').value.trim(), car: ($('#r_make').value.trim() + ' ' + $('#r_model').value.trim()).trim(), color: $('#r_color').value, year: $('#r_year').value, plate: $('#r_plate').value, phone: $('#r_phone').value, car_photo: ph.car_photo, driver_photo: ph.driver_photo }));
+    rk.onclick = async () => {
+      const g = (id) => $('#' + id).value.trim();
+      if (!g('r_first') || !g('r_last')) return toast('Укажите имя и фамилию');
+      if (!g('r_make') || !g('r_model')) return toast('Укажите марку и модель');
+      if (!g('r_color')) return toast('Укажите цвет авто');
+      if (!g('r_year')) return toast('Укажите год авто');
+      if (!g('r_plate')) return toast('Укажите номер авто');
+      rk.disabled = true;
+      try {
+        await api('driver/register', { name: g('r_first') + ' ' + g('r_last'), car: g('r_make') + ' ' + g('r_model'), color: g('r_color'), year: g('r_year'), plate: g('r_plate'), phone: g('r_phone'), car_photo: ph.car_photo, driver_photo: ph.driver_photo });
+        REGDRAFT = {}; ls('regdraft', '{}'); S.ph = {};
+        await refresh(true);
+      } catch (e) { toast(e.message); rk.disabled = false; }
+    };
   }
   const pk = $('#pay_ok');
   if (pk) pk.onclick = () => act(async () => { await api('driver/pay', {}); toast('Заявка отправлена'); });
